@@ -2,9 +2,9 @@ node_modules/
 dist/
 *.pem
 *.key
-data/*.db
-data/*.db-shm
-data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
 server/uploads/
 server/results/
 server/templates/
