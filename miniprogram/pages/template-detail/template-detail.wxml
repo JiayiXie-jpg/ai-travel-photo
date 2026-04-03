@@ -1,0 +1,64 @@
+<view class="container" wx:if="{{template}}">
+  <!-- 模板预览 -->
+  <view class="preview-section">
+    <image src="{{template.image_url}}" mode="widthFix" class="preview-img"></image>
+  </view>
+
+  <!-- 上传照片（旅拍模式） -->
+  <view class="upload-section" wx:if="{{category !== 'tryon'}}">
+    <view class="section-title">上传你的照片</view>
+    <view class="upload-area" bindtap="onUploadTap">
+      <image wx:if="{{userPhoto}}" src="{{userPhoto}}" mode="aspectFill" class="user-photo"></image>
+      <view wx:else class="upload-placeholder">
+        <text class="upload-icon">+</text>
+        <text class="upload-text">点击上传正面照</text>
+        <text class="upload-hint">建议使用清晰的正面照片</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 上传照片（试衣模式） -->
+  <view class="upload-section" wx:if="{{category === 'tryon'}}">
+    <view class="upload-area" bindtap="onUploadTap">
+      <image wx:if="{{userPhoto}}" src="{{userPhoto}}" mode="aspectFill" class="user-photo"></image>
+      <view wx:else class="upload-placeholder">
+        <text class="upload-icon">+</text>
+        <text class="upload-text">点击上传全身照</text>
+        <text class="upload-hint">建议使用清晰的全身照片</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 体型选择（试衣模式，上传照片后显示） -->
+  <view class="select-section" wx:if="{{category === 'tryon' && userPhotoFilename}}">
+    <text class="select-label">选择您的体型：</text>
+    <view class="body-type-group">
+      <view class="body-type-item {{bodyType === '瘦' ? 'active' : ''}}" bindtap="onBodyTypeTap" data-type="瘦">瘦</view>
+      <view class="body-type-item {{bodyType === '微胖' ? 'active' : ''}}" bindtap="onBodyTypeTap" data-type="微胖">微胖</view>
+      <view class="body-type-item {{bodyType === '胖' ? 'active' : ''}}" bindtap="onBodyTypeTap" data-type="胖">胖</view>
+    </view>
+  </view>
+
+  <!-- 年龄选择（试衣模式，上传照片后显示） -->
+  <view class="select-section" wx:if="{{category === 'tryon' && userPhotoFilename}}">
+    <text class="select-label">选择您的年龄：</text>
+    <picker mode="selector" range="{{ageOptions}}" value="{{ageIndex}}" bindchange="onAgePicker">
+      <view class="age-picker">
+        <text>{{ageOptions[ageIndex]}}</text>
+        <text class="picker-arrow">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 提交按钮 -->
+  <button class="submit-btn gradient-btn {{!userPhotoFilename ? 'disabled' : ''}}"
+          bindtap="onSubmitTap"
+          disabled="{{!userPhotoFilename || submitting}}">
+    {{submitting ? '提交中...' : (category === 'tryon' ? '开始AI试衣' : '开始AI旅拍')}}
+  </button>
+
+  <!-- 底部版权 -->
+  <view class="copyright" wx:if="{{category === 'tryon'}}">
+    <text>Copyright 2025 蓝梅旗袍·汉服·民族服体验馆 - 版权所有</text>
+  </view>
+</view>

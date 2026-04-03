@@ -1,0 +1,32 @@
+<view class="container">
+  <view class="page-title">我的旅拍作品</view>
+
+  <!-- 任务列表 -->
+  <view class="task-list" wx:if="{{!loading && tasks.length > 0}}">
+    <view class="task-card" wx:for="{{tasks}}" wx:key="id" bindtap="onTaskTap" data-id="{{item.id}}">
+      <image src="{{item.template_image_url}}" mode="aspectFill" class="task-thumb"></image>
+      <view class="task-info">
+        <text class="task-title">{{item.style_name || '旅拍照片'}}</text>
+        <text class="task-time">{{item.created_at}}</text>
+        <view class="task-status status-{{item.status}}">
+          {{item.status === 'completed' ? '已完成' : item.status === 'failed' ? '失败' : item.status === 'processing' ? '处理中' : '等待中'}}
+        </view>
+      </view>
+      <image wx:if="{{item.result_image_url}}" src="{{item.result_image_url}}" mode="aspectFill" class="task-result-thumb"></image>
+      <view wx:else class="task-arrow">></view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && tasks.length === 0}}">
+    <text class="empty-icon">📷</text>
+    <text class="empty-text">还没有旅拍作品</text>
+    <navigator url="/pages/index/index" open-type="switchTab" class="empty-btn">
+      去选模板
+    </navigator>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+</view>

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.pem
+*.key
+data/*.db
+data/*.db-shm
+data/*.db-wal
+server/uploads/
+server/results/
+server/templates/
+.DS_Store
+*.log
+.env

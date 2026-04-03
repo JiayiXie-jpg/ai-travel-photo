@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模板管理 - AI旅拍</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="logo">AI旅拍</div>
+    <a href="/admin/" class="nav-item">仪表盘</a>
+    <a href="/admin/templates.html" class="nav-item active">模板管理</a>
+    <a href="/admin/tasks.html" class="nav-item">任务记录</a>
+  </nav>
+
+  <main class="content">
+    <!-- 顶部操作栏 -->
+    <div class="page-header">
+      <h1>模板管理</h1>
+      <button class="btn btn-primary" onclick="showUploadModal()">+ 上传模板</button>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索风格名称..." class="input" oninput="onSearch()">
+      <label class="checkbox-label">
+        <input type="checkbox" id="showInactive" onchange="loadAll()"> 显示已下架
+      </label>
+    </div>
+
+    <!-- 风格列表 -->
+    <div id="styleList"></div>
+
+    <!-- 上传弹窗 -->
+    <div class="modal-overlay" id="uploadModal" style="display:none" onclick="hideUploadModal(event)">
+      <div class="modal">
+        <h2>上传模板图片</h2>
+        <div class="form-group">
+          <label>风格名称</label>
+          <input type="text" id="uploadStyleName" placeholder="如：日系清新、欧洲街拍、海岛风情" class="input" list="styleOptions">
+          <datalist id="styleOptions"></datalist>
+          <small class="hint">输入已有风格名会追加到该风格下，输入新名称会创建新风格</small>
+        </div>
+        <div class="form-group">
+          <label>模板类型</label>
+          <select id="uploadCategory" class="input">
+            <option value="travel">AI旅拍</option>
+            <option value="tryon">AI试衣</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>套餐类型</label>
+          <select id="uploadPackageType" class="input">
+            <option value="">不选</option>
+            <option value="单人">单人</option>
+            <option value="情侣">情侣</option>
+            <option value="闺蜜">闺蜜</option>
+            <option value="亲子">亲子</option>
+            <option value="全家">全家</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>服装子类</label>
+          <select id="uploadSubCategory" class="input">
+            <option value="">不选</option>
+            <option value="汉服">汉服</option>
+            <option value="旗袍">旗袍</option>
+            <option value="民族服">民族服</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>场景描述 (英文 Prompt)</label>
+          <textarea id="uploadPrompt" class="input" rows="3" placeholder="如：Generate a photo of the exact same person from the reference image wearing a traditional Miao ethnic costume with silver crown, standing in a lush garden..."></textarea>
+          <small class="hint">描述模板中的场景、服装、姿势等，生成时会结合用户照片使用</small>
+        </div>
+        <div class="form-group">
+          <label>选择图片（可多选）</label>
+          <input type="file" id="uploadFiles" accept="image/*" multiple class="input">
+          <div id="uploadPreview" class="upload-preview"></div>
+        </div>
+        <div class="form-row" style="justify-content:flex-end">
+          <button class="btn" onclick="hideUploadModal()">取消</button>
+          <button class="btn btn-primary" id="uploadBtn" onclick="doUpload()">上传</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/admin.js"></script>
+  <script>
+    let allStyles = [];
+    let searchTimer = null;
+
+    // 加载所有数据
+    async function loadAll() {
+      const showInactive = document.getElementById('showInactive').checked;
+      const keyword = document.getElementById('searchInput').value.trim();
+
+      const params = new URLSearchParams();
+      if (showInactive) params.set('show_inactive', '1');
+      if (keyword) params.set('keyword', keyword);
+
+      const [stylesRes, tplRes] = await Promise.all([
+        api('/admin/styles'),
+        api('/admin/templates?' + params.toString()),
+      ]);
+
+      if (stylesRes.code === 0) allStyles = stylesRes.data;
+
+      if (tplRes.code === 0) {
+        renderStyles(tplRes.data);
+      }
+    }
+
+    function renderStyles(templates) {
+      // 按风格分组
+      const groups = {};
+      templates.forEach(t => {
+        if (!groups[t.style_name]) groups[t.style_name] = [];
+        groups[t.style_name].push(t);
+      });
+
+      const container = document.getElementById('styleList');
+      if (Object.keys(groups).length === 0) {
+        container.innerHTML = '<div class="empty-state">暂无模板，点击右上角上传</div>';
+        return;
+      }
+
+      container.innerHTML = Object.entries(groups).map(([style, items]) => {
+        const activeCount = items.filter(i => i.is_active).length;
+        const totalCount = items.length;
+        return `
+          <div class="style-group">
+            <div class="style-header">
+              <div class="style-title">
+                <h3>${style}</h3>
+                <span class="style-count">${activeCount}/${totalCount} 张</span>
+              </div>
+              <div class="style-actions">
+                <label class="btn btn-sm btn-add-img">
+                  + 添加图片
+                  <input type="file" accept="image/*" multiple style="display:none" onchange="addImagesToStyle('${escapeHtml(style)}', this)">
+                </label>
+                <button class="btn btn-sm" onclick="renameStyle('${escapeHtml(style)}')">重命名</button>
+                <button class="btn btn-sm" onclick="toggleStyle('${escapeHtml(style)}', 0)">全部下架</button>
+                <button class="btn btn-sm" onclick="toggleStyle('${escapeHtml(style)}', 1)">全部上架</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteStyle('${escapeHtml(style)}')">删除风格</button>
+              </div>
+            </div>
+            <div class="template-grid">
+              ${items.map(t => `
+                <div class="template-card ${t.is_active ? '' : 'inactive'}">
+                  <img src="${t.image_url}" alt="模板">
+                  ${t.category === 'tryon' ? '<div class="category-badge tryon">试衣</div>' : '<div class="category-badge travel">旅拍</div>'}
+                  <div class="template-prompt ${t.scene_prompt ? '' : 'no-prompt'}" onclick="editPrompt(${t.id}, this)" title="${t.scene_prompt ? t.scene_prompt.replace(/"/g, '&quot;') : '点击添加场景描述'}">
+                    ${t.scene_prompt ? '📝 ' + t.scene_prompt.substring(0, 40) + (t.scene_prompt.length > 40 ? '...' : '') : '⚠️ 无场景描述'}
+                  </div>
+                  <div class="template-overlay">
+                    <button class="btn btn-sm" onclick="toggleTemplate(${t.id})">${t.is_active ? '下架' : '上架'}</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate(${t.id})">删除</button>
+                  </div>
+                  ${t.is_active ? '' : '<div class="inactive-badge">已下架</div>'}
+                </div>
+              `).join('')}
+              <div class="template-card add-card" onclick="this.querySelector('input').click()">
+                <div class="add-card-inner">
+                  <span class="add-icon">+</span>
+                  <span class="add-text">添加图片</span>
+                </div>
+                <input type="file" accept="image/*" multiple style="display:none" onchange="addImagesToStyle('${escapeHtml(style)}', this)">
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    function onSearch() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadAll, 300);
+    }
+
+    // 上传弹窗
+    function showUploadModal() {
+      document.getElementById('uploadModal').style.display = 'flex';
+      // 填充已有风格到 datalist
+      const dl = document.getElementById('styleOptions');
+      dl.innerHTML = allStyles.map(s => `<option value="${s.style_name}">`).join('');
+    }
+
+    function hideUploadModal(e) {
+      if (!e || e.target === document.getElementById('uploadModal')) {
+        document.getElementById('uploadModal').style.display = 'none';
+        document.getElementById('uploadFiles').value = '';
+        document.getElementById('uploadPreview').innerHTML = '';
+      }
+    }
+
+    document.getElementById('uploadFiles').addEventListener('change', function() {
+      const preview = document.getElementById('uploadPreview');
+      preview.innerHTML = '';
+      Array.from(this.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    async function doUpload() {
+      const styleName = document.getElementById('uploadStyleName').value.trim();
+      const files = document.getElementById('uploadFiles').files;
+      if (!styleName) return alert('请输入风格名称');
+      if (!files.length) return alert('请选择图片');
+
+      const btn = document.getElementById('uploadBtn');
+      btn.disabled = true;
+      btn.textContent = '上传中...';
+
+      const formData = new FormData();
+      const scenePrompt = document.getElementById('uploadPrompt').value.trim();
+      const category = document.getElementById('uploadCategory').value;
+      const packageType = document.getElementById('uploadPackageType').value;
+      const subCategory = document.getElementById('uploadSubCategory').value;
+      formData.append('style_name', styleName);
+      formData.append('scene_prompt', scenePrompt);
+      formData.append('category', category);
+      formData.append('package_type', packageType);
+      formData.append('sub_category', subCategory);
+      for (const file of files) {
+        formData.append('images', file);
+      }
+
+      const res = await apiUpload('/admin/templates', formData);
+      if (res.code === 0) {
+        hideUploadModal();
+        document.getElementById('uploadStyleName').value = '';
+        document.getElementById('uploadPrompt').value = '';
+        document.getElementById('uploadCategory').value = 'travel';
+        document.getElementById('uploadPackageType').value = '';
+        document.getElementById('uploadSubCategory').value = '';
+        loadAll();
+        alert(res.message);
+      } else {
+        alert(res.message || '上传失败');
+      }
+
+      btn.disabled = false;
+      btn.textContent = '上传';
+    }
+
+    // 给指定风格追加图片
+    async function addImagesToStyle(styleName, inputEl) {
+      const files = inputEl.files;
+      if (!files || files.length === 0) return;
+
+      const formData = new FormData();
+      formData.append('style_name', styleName);
+      for (const file of files) {
+        formData.append('images', file);
+      }
+
+      const res = await apiUpload('/admin/templates', formData);
+      if (res.code === 0) {
+        loadAll();
+      } else {
+        alert(res.message || '上传失败');
+      }
+
+      inputEl.value = '';
+    }
+
+    // 操作
+    async function toggleTemplate(id) {
+      await api(`/admin/templates/${id}/toggle`, 'PUT');
+      loadAll();
+    }
+
+    async function deleteTemplate(id) {
+      if (!confirm('确定删除此模板图片？')) return;
+      await api(`/admin/templates/${id}`, 'DELETE');
+      loadAll();
+    }
+
+    async function toggleStyle(name, active) {
+      const action = active ? '上架' : '下架';
+      if (!confirm(`确定${action}「${name}」下所有图片？`)) return;
+      await api(`/admin/styles/${encodeURIComponent(name)}/toggle`, 'PUT', { active });
+      loadAll();
+    }
+
+    async function deleteStyle(name) {
+      if (!confirm(`确定删除整个风格「${name}」及所有图片？此操作不可恢复！`)) return;
+      await api(`/admin/styles/${encodeURIComponent(name)}`, 'DELETE');
+      loadAll();
+    }
+
+    async function editPrompt(id, el) {
+      const current = el.title || '';
+      const newPrompt = prompt('编辑场景描述 (英文 Prompt):', current === '点击添加场景描述' ? '' : current);
+      if (newPrompt === null) return;
+      const res = await api(`/admin/templates/${id}/prompt`, 'PUT', { scene_prompt: newPrompt });
+      if (res.code === 0) loadAll();
+      else alert(res.message || '更新失败');
+    }
+
+    async function renameStyle(name) {
+      const newName = prompt('新的风格名称:', name);
+      if (!newName || newName === name) return;
+      await api(`/admin/styles/${encodeURIComponent(name)}`, 'PUT', { new_name: newName });
+      loadAll();
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>

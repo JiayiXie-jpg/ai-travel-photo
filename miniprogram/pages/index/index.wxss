@@ -1,0 +1,164 @@
+/* 搜索栏 */
+.search-bar {
+  padding: 16rpx 0 12rpx;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #2a2a2a;
+  border-radius: 36rpx;
+  padding: 14rpx 24rpx;
+}
+
+.search-icon {
+  font-size: 28rpx;
+  margin-right: 12rpx;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #e0e0e0;
+}
+
+/* 分类筛选 */
+.filter-section {
+  padding: 8rpx 0 16rpx;
+}
+
+.filter-label {
+  font-size: 24rpx;
+  color: #888;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.filter-scroll {
+  white-space: nowrap;
+  margin-bottom: 12rpx;
+}
+
+.filter-item {
+  display: inline-block;
+  padding: 10rpx 28rpx;
+  margin-right: 16rpx;
+  font-size: 28rpx;
+  color: #ccc;
+  position: relative;
+}
+
+.filter-item.active {
+  color: #fff;
+  font-weight: 600;
+}
+
+.filter-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 4rpx;
+  background: #fff;
+  border-radius: 2rpx;
+}
+
+/* 模板网格 */
+.template-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.template-card {
+  width: 48%;
+  margin-bottom: 20rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+.template-img {
+  width: 100%;
+  height: 480rpx;
+}
+
+.card-footer {
+  padding: 16rpx 16rpx 20rpx;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-likes {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  margin-top: 4rpx;
+}
+
+.ai-tag {
+  flex-shrink: 0;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+  margin-left: 8rpx;
+}
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #888;
+  font-size: 28rpx;
+}
+
+/* 加载中 */
+.loading {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #888;
+  font-size: 28rpx;
+}
+
+.loading-spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 4rpx solid #333;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  margin: 0 auto 16rpx;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 底部版权 */
+.copyright {
+  text-align: center;
+  padding: 40rpx 0 20rpx;
+  font-size: 20rpx;
+  color: #555;
+}

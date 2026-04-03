@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务记录 - AI旅拍</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="logo">AI旅拍</div>
+    <a href="/admin/" class="nav-item">仪表盘</a>
+    <a href="/admin/templates.html" class="nav-item">模板管理</a>
+    <a href="/admin/tasks.html" class="nav-item active">任务记录</a>
+  </nav>
+
+  <main class="content">
+    <h1>任务记录</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>用户照片</th>
+          <th>风格</th>
+          <th>状态</th>
+          <th>结果</th>
+          <th>创建时间</th>
+        </tr>
+      </thead>
+      <tbody id="taskList"></tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+  </main>
+
+  <script src="js/admin.js"></script>
+  <script>
+    let currentPage = 1;
+
+    async function loadTasks(page) {
+      currentPage = page;
+      const res = await api(`/admin/tasks?page=${page}`);
+      if (res.code === 0) {
+        const { tasks, total, pageSize } = res.data;
+        document.getElementById('taskList').innerHTML = tasks.map(t => `
+          <tr>
+            <td>${t.id}</td>
+            <td>${t.user_photo_url ? `<img src="${t.user_photo_url}" class="thumb">` : '-'}</td>
+            <td>${t.style_name || '-'}</td>
+            <td><span class="badge badge-${t.status}">${statusText(t.status)}</span></td>
+            <td>${t.result_image_url ? `<a href="${t.result_image_url}" target="_blank"><img src="${t.result_image_url}" class="thumb"></a>` : '-'}</td>
+            <td>${t.created_at}</td>
+          </tr>
+        `).join('');
+
+        const totalPages = Math.ceil(total / pageSize);
+        let pagHtml = '';
+        if (currentPage > 1) pagHtml += `<button class="btn btn-sm" onclick="loadTasks(${currentPage-1})">上一页</button>`;
+        pagHtml += `<span> 第 ${currentPage} / ${totalPages || 1} 页 </span>`;
+        if (currentPage < totalPages) pagHtml += `<button class="btn btn-sm" onclick="loadTasks(${currentPage+1})">下一页</button>`;
+        document.getElementById('pagination').innerHTML = pagHtml;
+      }
+    }
+
+    loadTasks(1);
+  </script>
+</body>
+</html>

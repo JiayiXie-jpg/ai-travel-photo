@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>蓝梅旅拍 - 预览</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    @media (min-width: 500px) {
+      body { border-left: 1px solid #333; border-right: 1px solid #333; }
+    }
+
+    /* Nav bar */
+    .navbar {
+      background: #1a1a1a;
+      color: white;
+      padding: 12px 16px;
+      font-size: 17px;
+      font-weight: 600;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .navbar .back-btn {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      display: none;
+    }
+
+    /* Mode tabs (旅拍/试衣) */
+    .mode-tabs {
+      display: flex;
+      background: #1a1a1a;
+      border-bottom: 1px solid #333;
+    }
+
+    .mode-tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px 0;
+      font-size: 15px;
+      color: #888;
+      cursor: pointer;
+      border: none;
+      background: none;
+      position: relative;
+      transition: color 0.2s;
+    }
+
+    .mode-tab.active {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .mode-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 3px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 2px;
+    }
+
+    /* Tab bar */
+    .tabbar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      background: #1a1a1a;
+      display: flex;
+      border-top: 1px solid #333;
+      z-index: 50;
+    }
+
+    .tab-item {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-size: 11px;
+      color: #666;
+      cursor: pointer;
+    }
+
+    .tab-item.active { color: #fff; }
+    .tab-item .tab-icon { font-size: 22px; display: block; }
+
+    /* Pages */
+    .page { display: none; padding: 12px 14px 70px; }
+    .page.active { display: block; }
+
+    /* Search bar */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: #2a2a2a;
+      border-radius: 20px;
+      padding: 8px 14px;
+      margin-bottom: 12px;
+    }
+
+    .search-bar input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: #e0e0e0;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+
+    .search-bar input::placeholder { color: #666; }
+
+    /* Filter section */
+    .filter-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .filter-scroll {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      padding: 4px 0 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-scroll::-webkit-scrollbar { display: none; }
+
+    .filter-item {
+      flex-shrink: 0;
+      padding: 6px 16px;
+      font-size: 14px;
+      color: #ccc;
+      cursor: pointer;
+      border: none;
+      background: none;
+      position: relative;
+    }
+
+    .filter-item.active {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .filter-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 2px;
+      background: #fff;
+      border-radius: 1px;
+    }
+
+    /* Template grid */
+    .tpl-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .tpl-card {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #1e1e1e;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .tpl-card:active { transform: scale(0.97); }
+
+    .tpl-card img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tpl-footer {
+      padding: 8px 10px 10px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    .tpl-info { flex: 1; min-width: 0; }
+
+    .tpl-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #e0e0e0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tpl-likes {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .ai-tag {
+      flex-shrink: 0;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+      margin-left: 6px;
+    }
+
+    /* Detail page */
+    .detail-img {
+      width: 100%;
+      border-radius: 14px;
+    }
+
+    .detail-style {
+      margin: 12px 0 20px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .upload-area {
+      width: 100%;
+      height: 180px;
+      border: 2px dashed #444;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: #1e1e1e;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .upload-area:hover { border-color: #667eea; }
+    .upload-area.has-photo {
+      border: none;
+      padding: 0;
+      display: block;
+    }
+    .upload-area .plus { font-size: 40px; color: #667eea; }
+    .upload-area .hint { font-size: 13px; color: #888; margin-top: 6px; }
+
+    .upload-area .user-preview {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+      border-radius: 14px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Processing page */
+    .processing-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 50vh;
+    }
+
+    .pulse {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(102, 126, 234, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .pulse-inner {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    .proc-title { font-size: 16px; font-weight: 600; margin-top: 24px; color: #e0e0e0; }
+    .proc-hint { font-size: 13px; color: #888; margin-top: 8px; }
+
+    .result-img {
+      width: 100%;
+      border-radius: 14px;
+      margin-bottom: 20px;
+    }
+
+    .result-actions { display: flex; flex-direction: column; gap: 12px; }
+
+    .result-actions button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 28px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-primary-action {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+    }
+
+    .btn-secondary-action {
+      background: #1e1e1e;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    /* History page */
+    .history-item {
+      display: flex;
+      align-items: center;
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .history-item img {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .history-info { flex: 1; margin: 0 12px; }
+    .history-info .name { font-size: 14px; font-weight: 500; color: #e0e0e0; }
+    .history-info .time { font-size: 12px; color: #888; margin-top: 4px; }
+    .history-info .status {
+      display: inline-block;
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+
+    .status-completed { background: #1a3a2a; color: #4ade80; }
+    .status-processing, .status-submitted { background: #1c2d4a; color: #60a5fa; }
+    .status-pending { background: #3d3520; color: #fbbf24; }
+    .status-failed { background: #3d1c1c; color: #f87171; }
+
+    .empty-state { text-align: center; padding: 80px 20px; color: #888; }
+    .empty-state .icon { font-size: 48px; }
+
+    .fail-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 50vh;
+    }
+
+    .fail-icon {
+      width: 60px;
+      height: 60px;
+      line-height: 60px;
+      text-align: center;
+      border-radius: 50%;
+      background: #3d1c1c;
+      color: #ef4444;
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .copyright {
+      text-align: center;
+      padding: 20px 0 10px;
+      font-size: 11px;
+      color: #555;
+    }
+
+    /* 体型和年龄选择 */
+    .select-section { margin-bottom: 16px; }
+
+    .body-type-group {
+      display: flex;
+      background: #2a2a2a;
+      border-radius: 22px;
+      overflow: hidden;
+    }
+
+    .body-type-item {
+      flex: 1;
+      text-align: center;
+      padding: 10px 0;
+      font-size: 14px;
+      color: #ccc;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .body-type-item.active {
+      background: #444;
+      color: #fff;
+      font-weight: 600;
+      border-radius: 22px;
+    }
+
+    .age-picker-select {
+      width: 100%;
+      background: #2a2a2a;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #e0e0e0;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      cursor: pointer;
+    }
+
+    .age-picker-select option { background: #2a2a2a; color: #e0e0e0; }
+  </style>
+</head>
+<body>
+  <!-- Nav Bar -->
+  <div class="navbar">
+    <button class="back-btn" id="backBtn" onclick="goBack()">&#8249;</button>
+    <span id="navTitle">蓝梅旅拍</span>
+  </div>
+
+  <!-- Page: 首页 -->
+  <div class="page active" id="pageHome">
+    <!-- 旅拍/试衣 切换 -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="tryon" onclick="switchMode('tryon')">AI试衣</button>
+      <button class="mode-tab" data-mode="travel" onclick="switchMode('travel')">AI旅拍</button>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar" style="margin-top:12px">
+      <span>&#x1F50D;</span>
+      <input id="searchInput" placeholder="搜索服装风格..." onkeydown="if(event.key==='Enter')onSearch()">
+    </div>
+
+    <!-- 分类筛选（仅试衣模式） -->
+    <div id="filterArea">
+      <div class="filter-label">套餐与子系分类：</div>
+      <div class="filter-scroll" id="pkgTabs"></div>
+      <div class="filter-scroll" id="subTabs"></div>
+    </div>
+
+    <!-- 模板列表 -->
+    <div class="tpl-grid" id="tplGrid"></div>
+    <div id="homeEmpty" class="empty-state" style="display:none">
+      <div class="icon">&#128247;</div>
+      <p>暂无模板</p>
+    </div>
+
+    <div class="copyright">Copyright 2025 蓝梅旗袍·汉服·民族服体验馆 - 版权所有</div>
+  </div>
+
+  <!-- Page: 模板详情 -->
+  <div class="page" id="pageDetail">
+    <img class="detail-img" id="detailImg" src="">
+    <div class="detail-style" id="detailStyle"></div>
+    <p id="uploadLabel" style="font-size:14px;font-weight:500;margin-bottom:10px;color:#ccc">上传你的照片</p>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <span class="plus">+</span>
+      <span class="hint">点击上传全身照</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="onFileSelected(event)">
+
+    <!-- 体型选择（上传照片后显示，仅试衣模式） -->
+    <div class="select-section" id="bodyTypeSection" style="display:none">
+      <p style="font-size:14px;color:#999;text-align:center;margin-bottom:10px">选择您的体型</p>
+      <div class="body-type-group">
+        <button class="body-type-item" data-type="瘦" onclick="selectBodyType('瘦')">瘦</button>
+        <button class="body-type-item active" data-type="微胖" onclick="selectBodyType('微胖')">微胖</button>
+        <button class="body-type-item" data-type="胖" onclick="selectBodyType('胖')">胖</button>
+      </div>
+    </div>
+
+    <!-- 年龄选择（上传照片后显示，仅试衣模式） -->
+    <div class="select-section" id="ageSection" style="display:none">
+      <p style="font-size:14px;color:#999;text-align:center;margin-bottom:10px">选择您的年龄段</p>
+      <select id="agePicker" class="age-picker-select">
+        <option value="">请选择年龄段</option>
+        <option value="10岁及以下">10岁及以下</option>
+        <option value="11-18岁">11-18岁</option>
+        <option value="19-30岁">19-30岁</option>
+        <option value="31-45岁">31-45岁</option>
+        <option value="46-60岁">46-60岁</option>
+        <option value="60岁以上">60岁以上</option>
+      </select>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" disabled onclick="submitTask()">开始生成</button>
+  </div>
+
+  <!-- Page: 处理中/结果 -->
+  <div class="page" id="pageProcessing">
+    <div class="processing-wrap" id="procLoading">
+      <div class="pulse"><div class="pulse-inner"></div></div>
+      <div class="proc-title" id="procTitle">AI正在为您生成</div>
+      <div class="proc-hint">预计需要10-30秒，请耐心等待...</div>
+    </div>
+    <div id="procResult" style="display:none">
+      <img class="result-img" id="resultImg" src="">
+      <div class="result-actions">
+        <a id="downloadLink" download="ai-photo.jpg"><button class="btn-primary-action">下载照片</button></a>
+        <button class="btn-secondary-action" onclick="goHome()">再来一张</button>
+      </div>
+    </div>
+    <div class="fail-wrap" id="procFail" style="display:none">
+      <div class="fail-icon">!</div>
+      <div class="proc-title" style="margin-top:20px">生成失败</div>
+      <div class="proc-hint" id="failMsg">请稍后重试</div>
+      <button class="submit-btn" style="margin-top:30px;max-width:200px" onclick="goHome()">重新选择</button>
+    </div>
+  </div>
+
+  <!-- Page: 我的 -->
+  <div class="page" id="pageMine">
+    <h2 style="font-size:18px;margin-bottom:16px;color:#e0e0e0">我的作品</h2>
+    <div id="historyList"></div>
+    <div id="mineEmpty" class="empty-state" style="display:none">
+      <div class="icon">&#128247;</div>
+      <p>还没有作品</p>
+      <button class="submit-btn" style="max-width:160px;margin:16px auto 0" onclick="switchTab('home')">去选模板</button>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tabbar">
+    <div class="tab-item active" data-tab="home" onclick="switchTab('home')">
+      <span class="tab-icon">&#9632;</span>模板
+    </div>
+    <div class="tab-item" data-tab="mine" onclick="switchTab('mine')">
+      <span class="tab-icon">&#9786;</span>我的
+    </div>
+  </div>
+
+  <script>
+    const API = '/api';
+    const userId = localStorage.getItem('user_id') || ('user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
+    localStorage.setItem('user_id', userId);
+
+    let currentMode = 'tryon'; // 'tryon' or 'travel'
+    let currentPkgType = '';
+    let currentSubCat = '';
+    let packageTypes = [];
+    let subCategories = [];
+    let selectedTemplate = null;
+    let uploadedFilename = '';
+    let pollTimer = null;
+    let pageStack = ['home'];
+    let selectedBodyType = '微胖';
+    let selectedAgeRange = '';
+
+    async function apiFetch(path) {
+      const res = await fetch(API + path);
+      return res.json();
+    }
+
+    // === Mode switch ===
+    function switchMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+      // 试衣模式显示分类筛选，旅拍模式隐藏
+      document.getElementById('filterArea').style.display = mode === 'tryon' ? 'block' : 'none';
+      loadTemplates();
+    }
+
+    // === Navigation ===
+    function showPage(name, pushStack = true) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+      document.getElementById('backBtn').style.display = (name === 'detail' || name === 'processing') ? 'block' : 'none';
+      const titles = { home: '蓝梅旅拍', detail: '选择模板', processing: '生成中', mine: '我的作品' };
+      document.getElementById('navTitle').textContent = titles[name] || '蓝梅旅拍';
+      if (pushStack) pageStack.push(name);
+    }
+
+    function goBack() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      pageStack.pop();
+      showPage(pageStack[pageStack.length - 1] || 'home', false);
+    }
+
+    function goHome() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      pageStack = ['home'];
+      switchTab('home');
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      if (tab === 'home') { showPage('home', false); pageStack = ['home']; loadTemplates(); }
+      else if (tab === 'mine') { showPage('mine', false); pageStack = ['mine']; loadHistory(); }
+    }
+
+    // === Categories ===
+    async function loadCategories() {
+      const [pkgRes, subRes] = await Promise.all([
+        apiFetch('/package-types'),
+        apiFetch('/sub-categories'),
+      ]);
+      if (pkgRes.code === 0) packageTypes = pkgRes.data;
+      if (subRes.code === 0) subCategories = subRes.data;
+      renderFilterTabs();
+    }
+
+    function renderFilterTabs() {
+      const pkgTabs = document.getElementById('pkgTabs');
+      pkgTabs.innerHTML = `<button class="filter-item ${!currentPkgType ? 'active' : ''}" onclick="filterPkg('')">全部</button>` +
+        packageTypes.map(p => `<button class="filter-item ${currentPkgType === p ? 'active' : ''}" onclick="filterPkg('${p}')">${p}</button>`).join('');
+
+      const subTabs = document.getElementById('subTabs');
+      subTabs.innerHTML = `<button class="filter-item ${!currentSubCat ? 'active' : ''}" onclick="filterSub('')">全部</button>` +
+        subCategories.map(s => `<button class="filter-item ${currentSubCat === s ? 'active' : ''}" onclick="filterSub('${s}')">${s}</button>`).join('');
+    }
+
+    function filterPkg(type) {
+      currentPkgType = type;
+      renderFilterTabs();
+      loadTemplates();
+    }
+
+    function filterSub(cat) {
+      currentSubCat = cat;
+      renderFilterTabs();
+      loadTemplates();
+    }
+
+    // === Search ===
+    function onSearch() {
+      const keyword = document.getElementById('searchInput').value.trim();
+      if (keyword) {
+        apiFetch('/templates?keyword=' + encodeURIComponent(keyword) + '&category=' + currentMode).then(res => {
+          if (res.code === 0) renderGrid(res.data);
+        });
+      } else {
+        loadTemplates();
+      }
+    }
+
+    // === Templates ===
+    async function loadTemplates() {
+      const params = ['category=' + currentMode];
+      if (currentMode === 'tryon') {
+        if (currentPkgType) params.push('package_type=' + encodeURIComponent(currentPkgType));
+        if (currentSubCat) params.push('sub_category=' + encodeURIComponent(currentSubCat));
+      }
+      const qs = '?' + params.join('&');
+      const res = await apiFetch('/templates' + qs);
+      if (res.code === 0) renderGrid(res.data);
+    }
+
+    function renderGrid(templates) {
+      const grid = document.getElementById('tplGrid');
+      const empty = document.getElementById('homeEmpty');
+      if (templates.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        grid.innerHTML = templates.map(t => `
+          <div class="tpl-card" onclick="openDetail(${t.id})">
+            <img src="${t.image_url}" loading="lazy">
+            <div class="tpl-footer">
+              <div class="tpl-info">
+                <div class="tpl-title">${t.style_name}</div>
+                <div class="tpl-likes">&#x2661; 35.9万</div>
+              </div>
+              <span class="ai-tag">${t.category === 'tryon' ? 'AI试衣' : 'AI旅拍'}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // === Body type & age ===
+    function selectBodyType(type) {
+      selectedBodyType = type;
+      document.querySelectorAll('.body-type-item').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+      });
+    }
+
+    // === Detail ===
+    async function openDetail(id) {
+      const res = await apiFetch('/templates/' + id);
+      if (res.code === 0) {
+        selectedTemplate = res.data;
+        const isTryon = (res.data.category === 'tryon');
+
+        document.getElementById('detailImg').src = res.data.image_url;
+        document.getElementById('detailStyle').textContent = res.data.style_name;
+        uploadedFilename = '';
+
+        // 根据模式调整文案
+        const btnLabel = isTryon ? '开始AI试衣' : '开始AI旅拍';
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').textContent = btnLabel;
+        document.getElementById('uploadLabel').textContent = isTryon ? '上传你的全身照' : '上传你的照片';
+
+        // 重置上传区域
+        const area = document.getElementById('uploadArea');
+        area.classList.remove('has-photo');
+        area.innerHTML = `<span class="plus">+</span><span class="hint">${isTryon ? '点击上传全身照' : '点击上传正面照'}</span>`;
+        document.getElementById('fileInput').value = '';
+
+        // 隐藏体型和年龄（上传后才显示）
+        document.getElementById('bodyTypeSection').style.display = 'none';
+        document.getElementById('ageSection').style.display = 'none';
+        selectedBodyType = '微胖';
+        selectedAgeRange = '';
+        document.querySelectorAll('.body-type-item').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.type === '微胖');
+        });
+        document.getElementById('agePicker').value = '';
+
+        showPage('detail');
+      }
+    }
+
+    function onFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 立即显示本地预览
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const area = document.getElementById('uploadArea');
+        area.classList.add('has-photo');
+        area.innerHTML = `<img class="user-preview" src="${ev.target.result}">`;
+      };
+      reader.readAsDataURL(file);
+
+      // 上传到服务器
+      const formData = new FormData();
+      formData.append('photo', file);
+      const isTryon = selectedTemplate && selectedTemplate.category === 'tryon';
+      const btnLabel = isTryon ? '开始AI试衣' : '开始AI旅拍';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = '上传中...';
+
+      fetch(API + '/upload', { method: 'POST', body: formData })
+        .then(async r => {
+          const ct = r.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) throw new Error(await r.text());
+          return r.json();
+        })
+        .then(res => {
+          if (res.code === 0) {
+            uploadedFilename = res.data.filename;
+            document.getElementById('submitBtn').disabled = false;
+            // 上传成功后，试衣模式显示体型和年龄选择
+            if (isTryon) {
+              document.getElementById('bodyTypeSection').style.display = 'block';
+              document.getElementById('ageSection').style.display = 'block';
+            }
+          } else {
+            alert(res.message || '上传失败');
+          }
+          document.getElementById('submitBtn').textContent = btnLabel;
+        })
+        .catch(err => {
+          alert('上传失败: ' + (err.message || '请检查服务'));
+          document.getElementById('submitBtn').textContent = btnLabel;
+        });
+    }
+
+    async function submitTask() {
+      if (!uploadedFilename || !selectedTemplate) return;
+      const isTryon = selectedTemplate.category === 'tryon';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = '提交中...';
+      try {
+        selectedAgeRange = document.getElementById('agePicker').value;
+        const taskData = {
+          template_id: selectedTemplate.id,
+          user_photo_filename: uploadedFilename,
+          user_openid: userId,
+          category: selectedTemplate.category || currentMode,
+        };
+        if (isTryon) {
+          taskData.body_type = selectedBodyType;
+          taskData.age_range = selectedAgeRange;
+        }
+        const res = await fetch(API + '/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(taskData),
+        }).then(r => r.json());
+        if (res.code === 0) {
+          openProcessing(res.data.task_id);
+        } else {
+          alert(res.message || '提交失败');
+          document.getElementById('submitBtn').disabled = false;
+          document.getElementById('submitBtn').textContent = isTryon ? '开始AI试衣' : '开始AI旅拍';
+        }
+      } catch {
+        alert('网络错误');
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('submitBtn').textContent = isTryon ? '开始AI试衣' : '开始AI旅拍';
+      }
+    }
+
+    // === Processing ===
+    function openProcessing(taskId) {
+      document.getElementById('procLoading').style.display = 'flex';
+      document.getElementById('procResult').style.display = 'none';
+      document.getElementById('procFail').style.display = 'none';
+      document.getElementById('procTitle').textContent = currentMode === 'tryon' ? 'AI正在为您试衣' : 'AI正在为您生成旅拍照';
+      showPage('processing');
+
+      pollTimer = setInterval(async () => {
+        try {
+          const res = await apiFetch('/tasks/' + taskId);
+          if (res.code === 0) {
+            const task = res.data;
+            if (task.status === 'completed') {
+              clearInterval(pollTimer); pollTimer = null;
+              document.getElementById('procLoading').style.display = 'none';
+              document.getElementById('procResult').style.display = 'block';
+              document.getElementById('resultImg').src = task.result_image_url;
+              document.getElementById('downloadLink').href = task.result_image_url;
+              document.getElementById('navTitle').textContent = '生成完成';
+            } else if (task.status === 'failed') {
+              clearInterval(pollTimer); pollTimer = null;
+              document.getElementById('procLoading').style.display = 'none';
+              document.getElementById('procFail').style.display = 'flex';
+              document.getElementById('failMsg').textContent = task.error_message || '请稍后重试';
+            }
+          }
+        } catch {}
+      }, 2000);
+    }
+
+    // === History ===
+    async function loadHistory() {
+      const res = await apiFetch('/tasks?openid=' + userId);
+      if (res.code === 0) {
+        const list = document.getElementById('historyList');
+        const empty = document.getElementById('mineEmpty');
+        if (res.data.length === 0) {
+          list.innerHTML = '';
+          empty.style.display = 'block';
+        } else {
+          empty.style.display = 'none';
+          const statusMap = { pending: '等待中', submitted: '已提交', processing: '处理中', completed: '已完成', failed: '失败' };
+          list.innerHTML = res.data.map(t => `
+            <div class="history-item" onclick="openProcessing(${t.id})">
+              <img src="${t.template_image_url || ''}">
+              <div class="history-info">
+                <div class="name">${t.style_name || '作品'}</div>
+                <div class="time">${t.created_at}</div>
+                <span class="status status-${t.status}">${statusMap[t.status] || t.status}</span>
+              </div>
+              ${t.result_image_url ? `<img src="${t.result_image_url}" style="margin-left:auto">` : ''}
+            </div>
+          `).join('');
+        }
+      }
+    }
+
+    // Init
+    loadCategories();
+    loadTemplates();
+  </script>
+</body>
+</html>

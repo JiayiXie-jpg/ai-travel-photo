@@ -1,0 +1,191 @@
+.preview-section {
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: #1e1e1e;
+  margin-bottom: 30rpx;
+}
+
+.preview-img {
+  width: 100%;
+}
+
+.template-meta {
+  padding: 20rpx 24rpx;
+}
+
+.template-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.template-category {
+  display: block;
+  font-size: 24rpx;
+  color: #888;
+  margin-top: 6rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+  color: #e0e0e0;
+}
+
+.upload-section {
+  margin-bottom: 30rpx;
+}
+
+.upload-area {
+  width: 100%;
+  height: 320rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 2rpx dashed #444;
+}
+
+.user-photo {
+  width: 100%;
+  height: 100%;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #888;
+}
+
+.upload-icon {
+  font-size: 80rpx;
+  color: #667eea;
+  line-height: 1;
+}
+
+.upload-text {
+  font-size: 28rpx;
+  margin-top: 10rpx;
+  color: #ccc;
+}
+
+.upload-hint {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 6rpx;
+}
+
+.compare-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-bottom: 30rpx;
+}
+
+.compare-item {
+  text-align: center;
+}
+
+.compare-img {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 16rpx;
+}
+
+.compare-label {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  margin-top: 8rpx;
+}
+
+.compare-arrow {
+  font-size: 40rpx;
+  color: #667eea;
+}
+
+.submit-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
+  border: none;
+  margin-top: 20rpx;
+}
+
+.submit-btn.disabled {
+  opacity: 0.5;
+}
+
+.gradient-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #667eea 50%, #764ba2 100%);
+}
+
+/* 体型和年龄选择 */
+.select-section {
+  margin-bottom: 30rpx;
+}
+
+.select-label {
+  display: block;
+  font-size: 28rpx;
+  color: #999;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.body-type-group {
+  display: flex;
+  background: #2a2a2a;
+  border-radius: 44rpx;
+  overflow: hidden;
+}
+
+.body-type-item {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  font-size: 28rpx;
+  color: #ccc;
+  transition: all 0.2s;
+}
+
+.body-type-item.active {
+  background: #444;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 44rpx;
+}
+
+.age-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #2a2a2a;
+  border-radius: 16rpx;
+  padding: 22rpx 28rpx;
+  font-size: 28rpx;
+  color: #e0e0e0;
+}
+
+.picker-arrow {
+  font-size: 24rpx;
+  color: #888;
+}
+
+/* 版权 */
+.copyright {
+  text-align: center;
+  padding: 40rpx 0 20rpx;
+  font-size: 20rpx;
+  color: #555;
+}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI旅拍 - 管理后台</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="logo">AI旅拍</div>
+    <a href="/admin/" class="nav-item active" data-page="dashboard">仪表盘</a>
+    <a href="/admin/templates.html" class="nav-item">模板管理</a>
+    <a href="/admin/tasks.html" class="nav-item">任务记录</a>
+  </nav>
+
+  <main class="content">
+    <h1>仪表盘</h1>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="stat-number" id="totalStyles">-</div><div class="stat-label">风格数</div></div>
+      <div class="stat-card"><div class="stat-number" id="totalTemplates">-</div><div class="stat-label">模板图片</div></div>
+      <div class="stat-card"><div class="stat-number" id="totalTasks">-</div><div class="stat-label">总任务</div></div>
+      <div class="stat-card success"><div class="stat-number" id="completedTasks">-</div><div class="stat-label">已完成</div></div>
+      <div class="stat-card danger"><div class="stat-number" id="failedTasks">-</div><div class="stat-label">失败</div></div>
+    </div>
+
+    <h2>最近任务</h2>
+    <table>
+      <thead><tr><th>ID</th><th>风格</th><th>状态</th><th>创建时间</th></tr></thead>
+      <tbody id="recentTasks"></tbody>
+    </table>
+  </main>
+
+  <script src="js/admin.js"></script>
+  <script>
+    async function loadDashboard() {
+      const stats = await api('/admin/stats');
+      if (stats.code === 0) {
+        document.getElementById('totalStyles').textContent = stats.data.totalStyles;
+        document.getElementById('totalTemplates').textContent = stats.data.totalTemplates;
+        document.getElementById('totalTasks').textContent = stats.data.totalTasks;
+        document.getElementById('completedTasks').textContent = stats.data.completedTasks;
+        document.getElementById('failedTasks').textContent = stats.data.failedTasks;
+      }
+
+      const tasks = await api('/admin/tasks?page=1');
+      if (tasks.code === 0) {
+        document.getElementById('recentTasks').innerHTML = tasks.data.tasks.slice(0, 10).map(t => `
+          <tr>
+            <td>${t.id}</td>
+            <td>${t.style_name || '-'}</td>
+            <td><span class="badge badge-${t.status}">${statusText(t.status)}</span></td>
+            <td>${t.created_at}</td>
+          </tr>
+        `).join('');
+      }
+    }
+    loadDashboard();
+  </script>
+</body>
+</html>

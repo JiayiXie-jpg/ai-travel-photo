@@ -1,0 +1,30 @@
+<view class="container">
+  <!-- 处理中 -->
+  <view class="processing-state" wx:if="{{status === 'pending' || status === 'submitted' || status === 'processing'}}">
+    <view class="pulse-ring">
+      <view class="pulse-dot"></view>
+    </view>
+    <text class="processing-title">AI正在为您生成旅拍照片</text>
+    <text class="processing-hint">预计需要10-30秒，请耐心等待...</text>
+  </view>
+
+  <!-- 完成 -->
+  <view class="result-state" wx:if="{{status === 'completed'}}">
+    <view class="result-card">
+      <image src="{{resultImageUrl}}" mode="widthFix" class="result-img" bindtap="onShareResult"></image>
+    </view>
+    <view class="result-actions">
+      <button class="action-btn primary" bindtap="onSaveToAlbum">保存到相册</button>
+      <button class="action-btn" bindtap="onShareResult">预览大图</button>
+      <button class="action-btn" bindtap="onTryAgain">再来一张</button>
+    </view>
+  </view>
+
+  <!-- 失败 -->
+  <view class="fail-state" wx:if="{{status === 'failed'}}">
+    <text class="fail-icon">!</text>
+    <text class="fail-title">生成失败</text>
+    <text class="fail-message">{{errorMessage || '请稍后重试'}}</text>
+    <button class="action-btn primary" bindtap="onTryAgain">重新选择</button>
+  </view>
+</view>

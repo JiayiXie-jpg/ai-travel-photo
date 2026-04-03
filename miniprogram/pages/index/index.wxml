@@ -1,0 +1,64 @@
+<view class="container">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <text class="search-icon">&#x1F50D;</text>
+      <input class="search-input" placeholder="搜索服装风格..." placeholder-style="color:#666"
+             value="{{searchKeyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" />
+    </view>
+  </view>
+
+  <!-- 分类标签 -->
+  <view class="filter-section">
+    <text class="filter-label">套餐与子系分类：</text>
+
+    <!-- 第一层：套餐类型 -->
+    <scroll-view scroll-x class="filter-scroll">
+      <view class="filter-item {{!currentPackageType ? 'active' : ''}}"
+            bindtap="onPackageTypeTap" data-type="">全部</view>
+      <view wx:for="{{packageTypes}}" wx:key="*this"
+            class="filter-item {{currentPackageType === item ? 'active' : ''}}"
+            bindtap="onPackageTypeTap" data-type="{{item}}">{{item}}</view>
+    </scroll-view>
+
+    <!-- 第二层：服装子类 -->
+    <scroll-view scroll-x class="filter-scroll">
+      <view class="filter-item {{!currentSubCategory ? 'active' : ''}}"
+            bindtap="onSubCategoryTap" data-category="">全部</view>
+      <view wx:for="{{subCategories}}" wx:key="*this"
+            class="filter-item {{currentSubCategory === item ? 'active' : ''}}"
+            bindtap="onSubCategoryTap" data-category="{{item}}">{{item}}</view>
+    </scroll-view>
+  </view>
+
+  <!-- 模板列表 -->
+  <view class="template-grid" wx:if="{{!loading && templates.length > 0}}">
+    <view class="template-card" wx:for="{{templates}}" wx:key="id"
+          bindtap="onTemplateTap" data-id="{{item.id}}">
+      <image src="{{item.image_url}}" mode="aspectFill" class="template-img" lazy-load></image>
+      <view class="card-footer">
+        <view class="card-info">
+          <text class="card-title">{{item.style_name}}</text>
+          <text class="card-likes">&#x2661; 35.9万</text>
+        </view>
+        <view class="ai-tag">{{item.category === 'tryon' ? 'AI试衣' : 'AI旅拍'}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty" wx:if="{{!loading && templates.length === 0}}">
+    <text>暂无模板</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text>加载中...</text>
+  </view>
+
+  <!-- 底部版权 -->
+  <view class="copyright">
+    <text>Copyright 2025 蓝梅旗袍·汉服·民族服体验馆 - 版权所有</text>
+  </view>
+</view>
