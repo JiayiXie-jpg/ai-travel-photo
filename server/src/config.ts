@@ -41,6 +41,11 @@ export const config = {
   pollInterval: 3000,   // 3秒
   maxPollAttempts: 60,   // 最多轮询60次 = 3分钟
 
+  // 豆包 Vision（AI 服饰推荐）
+  vision: {
+    model: process.env.VISION_MODEL || 'doubao-seed-2-0-pro-260215',
+  },
+
   // 蓝莓后台（远程模板同步）
   lanmei: {
     baseUrl: process.env.LANMEI_BASE_URL || 'https://crazyma99.xyz',

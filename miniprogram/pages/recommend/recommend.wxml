@@ -1,0 +1,62 @@
+<view class="container">
+  <!-- 上传区域 -->
+  <view wx:if="{{step === 'upload'}}">
+    <view class="header">
+      <text class="header-icon">&#10024;</text>
+      <text class="header-title">AI 智能推荐</text>
+      <text class="header-desc">上传照片，AI 为您推荐最适合的服饰风格</text>
+    </view>
+
+    <view class="upload-area {{photoPath ? 'has-photo' : ''}}" bindtap="onChoosePhoto">
+      <image wx:if="{{photoPath}}" src="{{photoPath}}" mode="aspectFill" class="upload-preview" />
+      <view wx:else class="upload-placeholder">
+        <text class="upload-plus">+</text>
+        <text class="upload-hint">点击上传照片（半身照或全身照均可）</text>
+      </view>
+    </view>
+
+    <button class="submit-btn {{!uploadedFilename ? 'disabled' : ''}}"
+            disabled="{{!uploadedFilename}}" bindtap="onSubmit">
+      {{btnText}}
+    </button>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{step === 'loading'}}" class="loading-wrap">
+    <view class="loading-pulse">
+      <view class="loading-pulse-inner"></view>
+    </view>
+    <text class="loading-title">AI 正在分析您的照片...</text>
+    <text class="loading-hint">正在匹配最适合的服饰风格</text>
+  </view>
+
+  <!-- 结果 -->
+  <view wx:if="{{step === 'result'}}">
+    <!-- 分析卡片 -->
+    <view class="analysis-card">
+      <text class="analysis-title">&#128269; AI 分析结果</text>
+      <view class="analysis-tags">
+        <text class="analysis-tag">年龄: {{analysis.estimated_age}}</text>
+        <text class="analysis-tag">脸型: {{analysis.face_shape}}</text>
+        <text class="analysis-tag">体型: {{analysis.body_type}}</text>
+      </view>
+      <view class="analysis-tags">
+        <text wx:for="{{analysis.style_keywords}}" wx:key="*this"
+              class="analysis-tag highlight">{{item}}</text>
+      </view>
+    </view>
+
+    <text class="section-title">为您推荐的服饰风格</text>
+
+    <view wx:for="{{recommendations}}" wx:key="style_name" class="rec-card"
+          bindtap="onRecTap" data-index="{{index}}">
+      <view class="rec-header">
+        <text class="rec-name">{{index + 1}}. {{item.style_name}}</text>
+        <text class="rec-score">匹配 {{item.score}}%</text>
+      </view>
+      <text class="rec-reason">{{item.reason}}</text>
+    </view>
+
+    <button class="submit-btn retry-btn" bindtap="onRetry">重新推荐</button>
+  </view>
+</view>

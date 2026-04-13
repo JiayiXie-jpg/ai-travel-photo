@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/template-detail/template-detail",
     "pages/processing/processing",
+    "pages/recommend/recommend",
     "pages/mine/mine"
   ],
   "window": {

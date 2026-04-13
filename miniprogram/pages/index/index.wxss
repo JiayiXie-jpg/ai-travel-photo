@@ -76,6 +76,44 @@
   border-radius: 2rpx;
 }
 
+/* AI推荐入口 */
+.recommend-banner {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #1e1e3e 0%, #2a1e3e 100%);
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.recommend-icon {
+  font-size: 48rpx;
+  margin-right: 16rpx;
+}
+
+.recommend-text {
+  flex: 1;
+}
+
+.recommend-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #f093fb;
+}
+
+.recommend-desc {
+  display: block;
+  font-size: 22rpx;
+  color: #aaa;
+  margin-top: 4rpx;
+}
+
+.recommend-arrow {
+  font-size: 36rpx;
+  color: #888;
+}
+
 /* 模板网格 */
 .template-grid {
   display: flex;

@@ -40,6 +40,16 @@
     </scroll-view>
   </view>
 
+  <!-- AI智能推荐入口 -->
+  <view class="recommend-banner" bindtap="onRecommendTap">
+    <text class="recommend-icon">&#10024;</text>
+    <view class="recommend-text">
+      <text class="recommend-title">AI智能推荐</text>
+      <text class="recommend-desc">拍照即可匹配最适合你的服饰</text>
+    </view>
+    <text class="recommend-arrow">&#8250;</text>
+  </view>
+
   <!-- 模板列表 -->
   <view class="template-grid" wx:if="{{!loading && templates.length > 0}}">
     <view class="template-card" wx:for="{{templates}}" wx:key="id"

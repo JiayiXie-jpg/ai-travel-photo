@@ -115,6 +115,10 @@ Page({
     this.setData({ loading: false });
   },
 
+  onRecommendTap() {
+    wx.navigateTo({ url: '/pages/recommend/recommend?shop_id=' + (this.data.currentShopId || '') });
+  },
+
   onTemplateTap(e) {
     const id = e.currentTarget.dataset.id;
     const item = this.data.templates.find(t => t.id === id);

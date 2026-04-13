@@ -484,6 +484,156 @@
       color: #555;
     }
 
+    /* AI 推荐 */
+    .recommend-btn {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 12px auto;
+      display: block;
+    }
+
+    .rec-analysis-card {
+      background: linear-gradient(135deg, #1e1e3e 0%, #2a1e3e 100%);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .rec-analysis-card h3 {
+      font-size: 15px;
+      color: #f093fb;
+      margin-bottom: 10px;
+    }
+
+    .rec-analysis-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .rec-tag {
+      background: rgba(255,255,255,0.1);
+      color: #e0e0e0;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .rec-card {
+      background: #1e1e1e;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .rec-card:active { transform: scale(0.97); }
+
+    .rec-card-header {
+      padding: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .rec-card-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .rec-card-score {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .rec-card-reason {
+      padding: 0 14px 14px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+    }
+
+    .rec-card-templates {
+      display: flex;
+      gap: 8px;
+      padding: 0 14px 14px;
+      overflow-x: auto;
+    }
+
+    .rec-card-templates img {
+      width: 80px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .rec-upload-area {
+      width: 100%;
+      height: 200px;
+      border: 2px dashed #444;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: #1e1e1e;
+      margin-bottom: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .rec-upload-area:hover { border-color: #f093fb; }
+    .rec-upload-area.has-photo { border: none; }
+    .rec-upload-area .plus { font-size: 40px; color: #f093fb; }
+    .rec-upload-area .hint { font-size: 13px; color: #888; margin-top: 6px; }
+    .rec-upload-area .user-preview {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+      border-radius: 14px;
+    }
+
+    .rec-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 0;
+    }
+
+    .rec-loading .pulse {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(240, 147, 251, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .rec-loading .pulse-inner {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
     /* 体型和年龄选择 */
     .select-section { margin-bottom: 16px; }
 
@@ -556,6 +706,7 @@
       <button class="mode-tab active" data-mode="tryon" onclick="switchMode('tryon')">AI试衣</button>
       <button class="mode-tab" data-mode="travel" onclick="switchMode('travel')">AI旅拍</button>
     </div>
+    <button class="recommend-btn" onclick="openRecommend()">&#10024; AI智能推荐 - 拍照选服饰</button>
 
     <!-- 搜索栏 -->
     <div class="search-bar" style="margin-top:8px">
@@ -640,6 +791,34 @@
     </div>
   </div>
 
+  <!-- Page: AI推荐 -->
+  <div class="page" id="pageRecommend">
+    <div id="recUploadSection">
+      <div style="text-align:center;padding:16px 0 8px">
+        <div style="font-size:18px;font-weight:600;color:#f093fb">&#10024; AI 智能推荐</div>
+        <div style="font-size:13px;color:#888;margin-top:6px">上传照片，AI 为您推荐最适合的服饰风格</div>
+      </div>
+      <div class="rec-upload-area" id="recUploadArea" onclick="document.getElementById('recFileInput').click()">
+        <span class="plus">+</span>
+        <span class="hint">点击上传照片（半身照或全身照均可）</span>
+      </div>
+      <input type="file" id="recFileInput" accept="image/*" style="display:none" onchange="onRecFileSelected(event)">
+      <button class="submit-btn" id="recSubmitBtn" disabled onclick="submitRecommend()" style="background:linear-gradient(135deg, #f093fb 0%, #f5576c 100%)">开始AI分析推荐</button>
+    </div>
+
+    <div class="rec-loading" id="recLoading" style="display:none">
+      <div class="pulse"><div class="pulse-inner"></div></div>
+      <div style="font-size:15px;font-weight:600;margin-top:20px;color:#e0e0e0">AI 正在分析您的照片...</div>
+      <div style="font-size:13px;color:#888;margin-top:6px">正在匹配最适合的服饰风格</div>
+    </div>
+
+    <div id="recResults" style="display:none">
+      <div class="rec-analysis-card" id="recAnalysis"></div>
+      <div style="font-size:15px;font-weight:600;color:#e0e0e0;margin-bottom:12px">为您推荐的服饰风格</div>
+      <div id="recList"></div>
+    </div>
+  </div>
+
   <!-- Page: 我的 -->
   <div class="page" id="pageMine">
     <h2 style="font-size:18px;margin-bottom:16px;color:#e0e0e0">我的作品</h2>
@@ -708,11 +887,12 @@
         shopDetail: 'pageShopDetail',
         detail: 'pageDetail',
         processing: 'pageProcessing',
+        recommend: 'pageRecommend',
         mine: 'pageMine',
       };
       document.getElementById(pageMap[name] || 'pageShops').classList.add('active');
       document.getElementById('backBtn').style.display = (name !== 'shops' && name !== 'mine') ? 'block' : 'none';
-      const titles = { shops: '蓝梅旅拍', shopDetail: currentShopName || '门店', detail: '选择模板', processing: '生成中', mine: '我的作品' };
+      const titles = { shops: '蓝梅旅拍', shopDetail: currentShopName || '门店', detail: '选择模板', processing: '生成中', recommend: 'AI智能推荐', mine: '我的作品' };
       document.getElementById('navTitle').textContent = titles[name] || '蓝梅旅拍';
       if (pushStack) pageStack.push(name);
     }
@@ -1064,6 +1244,125 @@
             </div>
           `).join('');
         }
+      }
+    }
+
+    // === AI 推荐 ===
+    let recUploadedFilename = '';
+
+    function openRecommend() {
+      // 重置状态
+      recUploadedFilename = '';
+      document.getElementById('recUploadSection').style.display = 'block';
+      document.getElementById('recLoading').style.display = 'none';
+      document.getElementById('recResults').style.display = 'none';
+      document.getElementById('recSubmitBtn').disabled = true;
+      const area = document.getElementById('recUploadArea');
+      area.classList.remove('has-photo');
+      area.innerHTML = '<span class="plus">+</span><span class="hint">点击上传照片（半身照或全身照均可）</span>';
+      document.getElementById('recFileInput').value = '';
+      showPage('recommend');
+    }
+
+    async function onRecFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('recSubmitBtn').disabled = true;
+      document.getElementById('recSubmitBtn').textContent = '压缩中...';
+
+      const compressed = await compressImage(file, 1200, 0.8);
+      const previewUrl = URL.createObjectURL(compressed);
+      const area = document.getElementById('recUploadArea');
+      area.classList.add('has-photo');
+      area.innerHTML = `<img class="user-preview" src="${previewUrl}">`;
+
+      const formData = new FormData();
+      formData.append('photo', compressed, 'photo.jpg');
+      document.getElementById('recSubmitBtn').textContent = '上传中...';
+
+      try {
+        const res = await fetch(API + '/upload', { method: 'POST', body: formData }).then(r => r.json());
+        if (res.code === 0) {
+          recUploadedFilename = res.data.filename;
+          document.getElementById('recSubmitBtn').disabled = false;
+        } else {
+          alert(res.message || '上传失败');
+        }
+      } catch (err) {
+        alert('上传失败: ' + (err.message || '请检查网络'));
+      }
+      document.getElementById('recSubmitBtn').textContent = '开始AI分析推荐';
+    }
+
+    async function submitRecommend() {
+      if (!recUploadedFilename) return;
+      document.getElementById('recUploadSection').style.display = 'none';
+      document.getElementById('recLoading').style.display = 'flex';
+      document.getElementById('recResults').style.display = 'none';
+
+      try {
+        const res = await fetch(API + '/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_photo_filename: recUploadedFilename,
+            shop_id: currentShopId || undefined,
+          }),
+        }).then(r => r.json());
+
+        document.getElementById('recLoading').style.display = 'none';
+
+        if (res.code === 0 && res.data) {
+          renderRecommendResults(res.data);
+        } else {
+          alert(res.message || 'AI 分析失败，请重试');
+          document.getElementById('recUploadSection').style.display = 'block';
+        }
+      } catch (err) {
+        document.getElementById('recLoading').style.display = 'none';
+        document.getElementById('recUploadSection').style.display = 'block';
+        alert('请求失败: ' + (err.message || '请检查网络'));
+      }
+    }
+
+    function renderRecommendResults(data) {
+      document.getElementById('recResults').style.display = 'block';
+
+      // 分析卡片
+      const a = data.analysis;
+      document.getElementById('recAnalysis').innerHTML = `
+        <h3>&#128269; AI 分析结果</h3>
+        <div class="rec-analysis-row">
+          <span class="rec-tag">年龄: ${a.estimated_age}</span>
+          <span class="rec-tag">脸型: ${a.face_shape}</span>
+          <span class="rec-tag">体型: ${a.body_type}</span>
+        </div>
+        <div class="rec-analysis-row">
+          ${(a.style_keywords || []).map(k => `<span class="rec-tag" style="background:rgba(240,147,251,0.15);color:#f093fb">${k}</span>`).join('')}
+        </div>
+      `;
+
+      // 推荐列表
+      const list = document.getElementById('recList');
+      list.innerHTML = data.recommendations.map((rec, i) => `
+        <div class="rec-card" onclick="onRecCardClick('${rec.style_name}', [${rec.template_ids.join(',')}])">
+          <div class="rec-card-header">
+            <span class="rec-card-name">${i + 1}. ${rec.style_name}</span>
+            <span class="rec-card-score">匹配 ${rec.score}%</span>
+          </div>
+          <div class="rec-card-reason">${rec.reason}</div>
+        </div>
+      `).join('');
+    }
+
+    function onRecCardClick(styleName, templateIds) {
+      if (templateIds.length > 0) {
+        openDetail(templateIds[0]);
+      } else {
+        // 没有模板 ID，跳回列表并搜索
+        document.getElementById('searchInput').value = styleName;
+        showPage('shopDetail');
+        onSearch();
       }
     }
 

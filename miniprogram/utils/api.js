@@ -68,4 +68,6 @@ module.exports = {
     request('/tasks', 'POST', Object.assign({ template_id: templateId, user_photo_filename: userPhotoFilename, user_openid: openid, category: category || 'travel' }, extra || {})),
   getTaskStatus: (taskId) => request('/tasks/' + taskId),
   getMyTasks: (openid) => request('/tasks?openid=' + openid),
+  recommend: (userPhotoFilename, shopId) =>
+    request('/recommend', 'POST', { user_photo_filename: userPhotoFilename, shop_id: shopId || undefined }),
 };

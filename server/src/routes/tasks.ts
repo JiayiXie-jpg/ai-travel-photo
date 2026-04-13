@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../database';
 import { executeTask } from '../services/taskPoller';
+import { recommendCostumes } from '../services/recommendation';
 import { config } from '../config';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
@@ -99,6 +100,31 @@ router.get('/tasks', (req, res) => {
 
   const tasks = db.prepare(sql).all(...params);
   res.json({ code: 0, data: tasks });
+});
+
+// AI 服饰推荐
+router.post('/recommend', async (req, res) => {
+  try {
+    const { user_photo_filename, shop_id } = req.body;
+
+    if (!user_photo_filename) {
+      return res.json({ code: -1, message: '缺少用户照片' });
+    }
+
+    if (!config.ark.apiKey) {
+      return res.json({ code: -1, message: 'AI 推荐服务未配置' });
+    }
+
+    const result = await recommendCostumes(
+      user_photo_filename,
+      shop_id ? Number(shop_id) : undefined,
+    );
+
+    res.json({ code: 0, data: result });
+  } catch (err: any) {
+    console.error('[Recommend] Error:', err.message);
+    res.json({ code: -1, message: err.message || 'AI 推荐失败' });
+  }
 });
 
 export default router;
