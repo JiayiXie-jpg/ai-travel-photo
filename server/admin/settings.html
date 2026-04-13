@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统设置 - AI旅拍</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="logo">AI旅拍</div>
+    <a href="/admin/" class="nav-item">仪表盘</a>
+    <a href="/admin/templates.html" class="nav-item">模板管理</a>
+    <a href="/admin/tasks.html" class="nav-item">任务记录</a>
+    <a href="/admin/settings.html" class="nav-item active">系统设置</a>
+  </nav>
+
+  <main class="content">
+    <div class="page-header">
+      <h1>系统设置</h1>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="resetDefaults()">恢复默认值</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">保存设置</button>
+      </div>
+    </div>
+
+    <p style="color:#888;margin-bottom:20px">配置 AI 生成时使用的 Prompt。每个模板可单独配置 Prompt（在模板管理页编辑），未配置的模板将使用以下全局默认值。</p>
+
+    <!-- AI旅拍 - 全图换脸 -->
+    <div class="setting-card">
+      <div class="setting-header">
+        <h3>AI旅拍 - 全图换脸 Prompt</h3>
+        <span class="setting-key">prompt_travel_full</span>
+      </div>
+      <p class="setting-desc">当旅拍模式使用全图换脸策略时（人脸检测失败的 fallback），使用此 Prompt。Image 1 = 用户照片，Image 2 = 模板照片。</p>
+      <textarea class="input setting-textarea" id="prompt_travel_full" rows="5"></textarea>
+    </div>
+
+    <!-- AI旅拍 - 裁剪换脸 -->
+    <div class="setting-card">
+      <div class="setting-header">
+        <h3>AI旅拍 - 裁剪换脸 Prompt</h3>
+        <span class="setting-key">prompt_travel_face</span>
+      </div>
+      <p class="setting-desc">当旅拍模式使用裁剪-换脸-贴回策略时（人脸检测成功），仅对裁剪出的脸部区域使用此 Prompt。</p>
+      <textarea class="input setting-textarea" id="prompt_travel_face" rows="5"></textarea>
+    </div>
+
+    <!-- AI试衣 -->
+    <div class="setting-card">
+      <div class="setting-header">
+        <h3>AI试衣 Prompt 模板</h3>
+        <span class="setting-key">prompt_tryon</span>
+      </div>
+      <p class="setting-desc">AI试衣模式使用此 Prompt。支持以下占位符，会根据用户选择自动替换：</p>
+      <div class="placeholder-list">
+        <code>${personDesc}</code> - 人物描述，如 "the person in image 1 (a young adult aged 19-30, with a slim and slender body type)"<br>
+        <code>${bodyDesc}</code> - 体型描述，如 "slim and slender"、"slightly chubby"、"plus-size"，未选择时为 "natural"
+      </div>
+      <textarea class="input setting-textarea" id="prompt_tryon" rows="6"></textarea>
+    </div>
+  </main>
+
+  <script src="js/admin.js"></script>
+  <script>
+    let originalSettings = {};
+
+    const DEFAULT_PROMPTS = {
+      prompt_travel_full: 'Replace the face in image 2 with the face in image 1. The facial contour and facial details must be completely consistent with the character in image 1 to ensure a high degree of similarity. The hairstyle and makeup must perfectly match the character in image 2. Keep the hairstyle, clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours and details must perfectly match the person in Image 1 to ensure high similarity.',
+      prompt_travel_face: 'Replace the face in image 2 with the face in image 1. The output face must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person in the output must be immediately recognizable as the same person in image 1. Keep the angle, lighting, and hair from image 2 unchanged. Generate the highest possible facial similarity to image 1.',
+      prompt_tryon: 'Replace the person in image 2 with ${personDesc}. The face, hairstyle, hair color, body shape, body proportions, and skin tone must be completely consistent with the person in image 1. The hairstyle must come from image 1 (the user\'s photo), NOT from image 2. The body type must appear ${bodyDesc} and match the user\'s actual physique. Keep the clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours, hairstyle, and details must perfectly match the person in Image 1 to ensure high similarity.',
+    };
+
+    async function loadSettings() {
+      const res = await api('/admin/settings');
+      if (res.code === 0) {
+        originalSettings = res.data;
+        for (const [key, value] of Object.entries(res.data)) {
+          const el = document.getElementById(key);
+          if (el) el.value = value;
+        }
+      }
+    }
+
+    async function saveSettings() {
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = '保存中...';
+
+      const data = {};
+      document.querySelectorAll('.setting-textarea').forEach(el => {
+        data[el.id] = el.value;
+      });
+
+      const res = await api('/admin/settings', 'PUT', data);
+      if (res.code === 0) {
+        alert('设置已保存');
+        originalSettings = { ...data };
+      } else {
+        alert(res.message || '保存失败');
+      }
+
+      btn.disabled = false;
+      btn.textContent = '保存设置';
+    }
+
+    function resetDefaults() {
+      if (!confirm('确定恢复所有 Prompt 为默认值？当前修改将丢失。')) return;
+      for (const [key, value] of Object.entries(DEFAULT_PROMPTS)) {
+        const el = document.getElementById(key);
+        if (el) el.value = value;
+      }
+    }
+
+    loadSettings();
+  </script>
+  <style>
+    .setting-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .setting-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .setting-header h3 { margin: 0; font-size: 16px; }
+    .setting-key {
+      font-family: monospace;
+      font-size: 12px;
+      color: #999;
+      background: #f5f5f5;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .setting-desc {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+    .setting-textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .placeholder-list {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 12px;
+      line-height: 1.8;
+    }
+    .placeholder-list code {
+      background: #e9ecef;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #d63384;
+    }
+  </style>
+</body>
+</html>

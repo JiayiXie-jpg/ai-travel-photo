@@ -40,4 +40,11 @@ export const config = {
   // 任务轮询
   pollInterval: 3000,   // 3秒
   maxPollAttempts: 60,   // 最多轮询60次 = 3分钟
+
+  // 蓝莓后台（远程模板同步）
+  lanmei: {
+    baseUrl: process.env.LANMEI_BASE_URL || 'https://crazyma99.xyz',
+    username: process.env.LANMEI_USERNAME || 'platformadmin',
+    password: process.env.LANMEI_PASSWORD || 'admin123',
+  },
 };

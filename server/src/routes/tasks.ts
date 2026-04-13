@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { getDb } from '../database';
 import { executeTask } from '../services/taskPoller';
 import { config } from '../config';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -33,8 +36,26 @@ router.post('/tasks', async (req, res) => {
     // 立即返回任务 ID，后台异步执行生成
     res.json({ code: 0, data: { task_id: taskId } });
 
+    // 如果模板图片是远程URL（image_path为空），先下载到本地
+    let templatePath = template.image_path;
+    if (!templatePath && template.image_url) {
+      try {
+        const resp = await fetch(template.image_url);
+        const buffer = Buffer.from(await resp.arrayBuffer());
+        const ext = path.extname(new URL(template.image_url).pathname) || '.jpg';
+        const filename = `${uuidv4()}${ext}`;
+        const filepath = path.join(config.paths.templates, filename);
+        fs.writeFileSync(filepath, buffer);
+        templatePath = filename;
+        // 更新数据库，下次不用再下载
+        db.prepare('UPDATE templates SET image_path = ? WHERE id = ?').run(filename, template_id);
+      } catch (dlErr: any) {
+        console.error('[Tasks] Failed to download template image:', dlErr.message);
+      }
+    }
+
     // 异步执行（不阻塞响应）
-    executeTask(taskId, template.image_path, user_photo_filename, category, { body_type, age_range });
+    executeTask(taskId, templatePath, user_photo_filename, category, { body_type, age_range, scene_prompt: template.scene_prompt || '' });
   } catch (err: any) {
     console.error('[Tasks] Create error:', err);
     res.json({ code: -1, message: err.message || '服务器错误' });

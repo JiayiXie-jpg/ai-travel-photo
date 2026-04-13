@@ -3,6 +3,7 @@ import path from 'path';
 import sharp from 'sharp';
 import { config } from '../config';
 import { detectFaceBox, FaceBox } from './faceDetect';
+import { getSetting } from '../database';
 
 interface ArkImageResponse {
   model?: string;
@@ -48,15 +49,23 @@ async function fileToDataUrl(filePath: string): Promise<string> {
   return bufferToDataUrl(buffer);
 }
 
-// 全图换脸 prompt（fallback 用）
-// 旅拍 prompt: image 1=用户脸, image 2=模板场景（昨天生效的版本）
-const FULL_PROMPT = 'Replace the face in image 2 with the face in image 1. The facial contour and facial details must be completely consistent with the character in image 1 to ensure a high degree of similarity. The hairstyle and makeup must perfectly match the character in image 2. Keep the hairstyle, clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours and details must perfectly match the person in Image 1 to ensure high similarity.';
+// 硬编码默认 prompt（兜底）
+const DEFAULT_FULL_PROMPT = 'Replace the face in image 2 with the face in image 1. The facial contour and facial details must be completely consistent with the character in image 1 to ensure a high degree of similarity. The hairstyle and makeup must perfectly match the character in image 2. Keep the hairstyle, clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours and details must perfectly match the person in Image 1 to ensure high similarity.';
 
-// 脸部特写换脸 prompt
-const FACE_PROMPT = 'Replace the face in image 2 with the face in image 1. The output face must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person in the output must be immediately recognizable as the same person in image 1. Keep the angle, lighting, and hair from image 2 unchanged. Generate the highest possible facial similarity to image 1.';
+const DEFAULT_FACE_PROMPT = 'Replace the face in image 2 with the face in image 1. The output face must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person in the output must be immediately recognizable as the same person in image 1. Keep the angle, lighting, and hair from image 2 unchanged. Generate the highest possible facial similarity to image 1.';
+
+const DEFAULT_TRYON_TEMPLATE = 'Replace the person in image 2 with ${personDesc}. The face, hairstyle, hair color, body shape, body proportions, and skin tone must be completely consistent with the person in image 1. The hairstyle must come from image 1 (the user\'s photo), NOT from image 2. The body type must appear ${bodyDesc} and match the user\'s actual physique. Keep the clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours, hairstyle, and details must perfectly match the person in Image 1 to ensure high similarity.';
+
+// 获取有效 prompt：模板级 > 全局设置 > 硬编码默认
+function getEffectivePrompt(settingKey: string, defaultValue: string, scenePrompt?: string): string {
+  if (scenePrompt && scenePrompt.trim()) return scenePrompt.trim();
+  const globalSetting = getSetting(settingKey);
+  if (globalSetting && globalSetting.trim()) return globalSetting.trim();
+  return defaultValue;
+}
 
 // AI试衣 prompt（保留用户体型）— 动态拼接体型和年龄
-function buildTryonPrompt(bodyType?: string, ageRange?: string): string {
+function buildTryonPrompt(bodyType?: string, ageRange?: string, scenePrompt?: string): string {
   let bodyDesc = '';
   if (bodyType === '瘦') bodyDesc = 'slim and slender';
   else if (bodyType === '微胖') bodyDesc = 'slightly chubby';
@@ -81,7 +90,11 @@ function buildTryonPrompt(bodyType?: string, ageRange?: string): string {
     personDesc = `the person in image 1 (${parts.join(', ')})`;
   }
 
-  return `Replace the person in image 2 with ${personDesc}. The face, hairstyle, hair color, body shape, body proportions, and skin tone must be completely consistent with the person in image 1. The hairstyle must come from image 1 (the user's photo), NOT from image 2. The body type must appear ${bodyDesc || 'natural'} and match the user's actual physique. Keep the clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours, hairstyle, and details must perfectly match the person in Image 1 to ensure high similarity.`;
+  // 获取 prompt 模板（模板级 > 全局设置 > 硬编码默认），然后替换占位符
+  const template = getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE, scenePrompt);
+  return template
+    .replace(/\$\{personDesc\}/g, personDesc)
+    .replace(/\$\{bodyDesc\}/g, bodyDesc || 'natural');
 }
 
 // API 要求最小像素数
@@ -192,6 +205,7 @@ async function cropSwapPasteBack(
   userFile: string,
   tplBox: FaceBox,
   userBox: FaceBox,
+  scenePrompt?: string,
 ): Promise<GenerateResult> {
   console.log('[Ark] Using crop-swap-paste strategy');
 
@@ -214,10 +228,11 @@ async function cropSwapPasteBack(
   const tplFaceDataUrl = await bufferToDataUrl(tplFaceBuffer);
 
   // 3. 调用 API 换脸（只换脸部区域）
+  const facePrompt = getEffectivePrompt('prompt_travel_face', DEFAULT_FACE_PROMPT, scenePrompt);
   const faceSize = calcFaceOutputSize(tplBox);
   const result = await callArkApi(
     [userFaceDataUrl, tplFaceDataUrl],
-    FACE_PROMPT,
+    facePrompt,
     faceSize,
   );
 
@@ -279,8 +294,11 @@ async function fullImageSwap(
   userFile: string,
   category: string = 'travel',
   extra: { body_type?: string; age_range?: string } = {},
+  scenePrompt?: string,
 ): Promise<GenerateResult> {
-  const prompt = category === 'tryon' ? buildTryonPrompt(extra.body_type, extra.age_range) : FULL_PROMPT;
+  const prompt = category === 'tryon'
+    ? buildTryonPrompt(extra.body_type, extra.age_range, scenePrompt)
+    : getEffectivePrompt('prompt_travel_full', DEFAULT_FULL_PROMPT, scenePrompt);
   console.log(`[Ark] Using full-image swap strategy, category=${category}`);
 
   const userDataUrl = await fileToDataUrl(userFile);
@@ -313,7 +331,7 @@ export async function generateTravelPhoto(
   templatePath: string,
   userPhotoPath: string,
   category: string = 'travel',
-  extra: { body_type?: string; age_range?: string } = {},
+  extra: { body_type?: string; age_range?: string; scene_prompt?: string } = {},
 ): Promise<GenerateResult> {
   const templateFile = path.join(config.paths.templates, templatePath);
   const userFile = path.join(config.paths.uploads, userPhotoPath);
@@ -334,13 +352,13 @@ export async function generateTravelPhoto(
       // 模板脸：适中 padding 保留周围区域用于融合
       // 用户脸：较小 padding，聚焦脸部特征，减少头发等干扰
       const [tplBox, userBox] = await Promise.all([
-        detectFaceBox(templateFile, 0.3, 0.4, 0.3, 0.3),
-        detectFaceBox(userFile, 0.15, 0.2, 0.15, 0.15),
+        detectFaceBox(templateFile, 0.2, 0.15, 0.2, 0.2),
+        detectFaceBox(userFile, 0.15, 0.15, 0.15, 0.15),
       ]);
 
       if (tplBox && userBox) {
         console.log('[Ark] Both faces detected, using crop-swap-paste');
-        const result = await cropSwapPasteBack(templateFile, userFile, tplBox, userBox);
+        const result = await cropSwapPasteBack(templateFile, userFile, tplBox, userBox, extra.scene_prompt);
         if (result.success) return result;
         console.log('[Ark] Crop-swap-paste failed, falling back to full-image swap');
       } else {
@@ -349,7 +367,7 @@ export async function generateTravelPhoto(
     }
 
     // 试衣 或 旅拍 fallback：全图方案
-    return await fullImageSwap(templateFile, userFile, category, extra);
+    return await fullImageSwap(templateFile, userFile, category, extra, extra.scene_prompt);
   } catch (err: any) {
     console.error('[Ark] Error:', err.message);
     return { success: false, error: '请求失败: ' + err.message };

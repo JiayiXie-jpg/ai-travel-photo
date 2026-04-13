@@ -424,6 +424,59 @@
       font-weight: bold;
     }
 
+    /* Shop grid */
+    .shop-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 8px 0;
+    }
+
+    .shop-card {
+      border-radius: 14px;
+      overflow: hidden;
+      background: #1e1e1e;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .shop-card:active { transform: scale(0.97); }
+
+    .shop-card-img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .shop-card-placeholder {
+      width: 100%;
+      height: 180px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+    }
+
+    .shop-card-info {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .shop-card-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .shop-card-arrow {
+      font-size: 18px;
+      color: #888;
+    }
+
     .copyright {
       text-align: center;
       padding: 20px 0 10px;
@@ -486,8 +539,18 @@
     <span id="navTitle">蓝梅旅拍</span>
   </div>
 
-  <!-- Page: 首页 -->
-  <div class="page active" id="pageHome">
+  <!-- Page: 店铺首页 -->
+  <div class="page active" id="pageShops">
+    <div style="padding:16px 0 8px;text-align:center">
+      <div style="font-size:18px;font-weight:600;color:#e0e0e0">选择门店</div>
+      <div style="font-size:13px;color:#888;margin-top:4px">请选择您要体验的门店</div>
+    </div>
+    <div class="shop-grid" id="shopGrid"></div>
+    <div class="copyright">Copyright 2025 蓝梅旗袍·汉服·民族服体验馆 - 版权所有</div>
+  </div>
+
+  <!-- Page: 店铺内页（模板列表） -->
+  <div class="page" id="pageShopDetail">
     <!-- 旅拍/试衣 切换 -->
     <div class="mode-tabs">
       <button class="mode-tab active" data-mode="tryon" onclick="switchMode('tryon')">AI试衣</button>
@@ -495,14 +558,14 @@
     </div>
 
     <!-- 搜索栏 -->
-    <div class="search-bar" style="margin-top:12px">
+    <div class="search-bar" style="margin-top:8px">
       <span>&#x1F50D;</span>
       <input id="searchInput" placeholder="搜索服装风格..." onkeydown="if(event.key==='Enter')onSearch()">
     </div>
 
-    <!-- 分类筛选（仅试衣模式） -->
+    <!-- 分类筛选 -->
     <div id="filterArea">
-      <div class="filter-label">套餐与子系分类：</div>
+      <div class="filter-label">套餐与服装分类：</div>
       <div class="filter-scroll" id="pkgTabs"></div>
       <div class="filter-scroll" id="subTabs"></div>
     </div>
@@ -604,6 +667,8 @@
     localStorage.setItem('user_id', userId);
 
     let currentMode = 'tryon'; // 'tryon' or 'travel'
+    let currentShopId = '';
+    let currentShopName = '';
     let currentPkgType = '';
     let currentSubCat = '';
     let packageTypes = [];
@@ -611,7 +676,7 @@
     let selectedTemplate = null;
     let uploadedFilename = '';
     let pollTimer = null;
-    let pageStack = ['home'];
+    let pageStack = ['shops'];
     let selectedBodyType = '微胖';
     let selectedAgeRange = '';
 
@@ -620,21 +685,34 @@
       return res.json();
     }
 
+    // 把 http://localhost:3000/xxx 转成相对路径 /xxx
+    function fixUrl(url) {
+      if (!url) return url;
+      return url.replace(/^https?:\/\/localhost(:\d+)?/, '');
+    }
+
     // === Mode switch ===
     function switchMode(mode) {
       currentMode = mode;
+      currentPkgType = '';
+      currentSubCat = '';
       document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
-      // 试衣模式显示分类筛选，旅拍模式隐藏
-      document.getElementById('filterArea').style.display = mode === 'tryon' ? 'block' : 'none';
       loadTemplates();
     }
 
     // === Navigation ===
     function showPage(name, pushStack = true) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
-      document.getElementById('backBtn').style.display = (name === 'detail' || name === 'processing') ? 'block' : 'none';
-      const titles = { home: '蓝梅旅拍', detail: '选择模板', processing: '生成中', mine: '我的作品' };
+      const pageMap = {
+        shops: 'pageShops',
+        shopDetail: 'pageShopDetail',
+        detail: 'pageDetail',
+        processing: 'pageProcessing',
+        mine: 'pageMine',
+      };
+      document.getElementById(pageMap[name] || 'pageShops').classList.add('active');
+      document.getElementById('backBtn').style.display = (name !== 'shops' && name !== 'mine') ? 'block' : 'none';
+      const titles = { shops: '蓝梅旅拍', shopDetail: currentShopName || '门店', detail: '选择模板', processing: '生成中', mine: '我的作品' };
       document.getElementById('navTitle').textContent = titles[name] || '蓝梅旅拍';
       if (pushStack) pageStack.push(name);
     }
@@ -647,21 +725,69 @@
 
     function goHome() {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      pageStack = ['home'];
+      pageStack = ['shops'];
       switchTab('home');
     }
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-      if (tab === 'home') { showPage('home', false); pageStack = ['home']; loadTemplates(); }
+      if (tab === 'home') { showPage('shops', false); pageStack = ['shops']; }
       else if (tab === 'mine') { showPage('mine', false); pageStack = ['mine']; loadHistory(); }
+    }
+
+    // === Shops ===
+    let shops = [];
+    async function loadShops() {
+      const res = await apiFetch('/shops');
+      if (res.code === 0) {
+        shops = res.data;
+        renderShopGrid();
+      }
+    }
+
+    function renderShopGrid() {
+      const grid = document.getElementById('shopGrid');
+      if (shops.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">&#127978;</div><p>暂无门店</p></div>';
+        return;
+      }
+      grid.innerHTML = shops.map(s => `
+        <div class="shop-card" onclick="enterShop(${s.id}, '${s.shop_name.replace(/'/g, "\\'")}')">
+          ${s.home_image
+            ? `<img class="shop-card-img" src="${s.home_image}" onerror="this.outerHTML='<div class=\\'shop-card-placeholder\\'>&#127978;</div>'">`
+            : '<div class="shop-card-placeholder">&#127978;</div>'}
+          <div class="shop-card-info">
+            <span class="shop-card-name">${s.shop_name}</span>
+            <span class="shop-card-arrow">&#8250;</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function enterShop(shopId, shopName) {
+      currentShopId = shopId;
+      currentShopName = shopName;
+      currentMode = 'tryon';
+      currentPkgType = '';
+      currentSubCat = '';
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'tryon'));
+      document.getElementById('filterArea').style.display = 'block';
+      showPage('shopDetail');
+      loadCategories();
+      loadTemplates();
     }
 
     // === Categories ===
     async function loadCategories() {
+      let pkgUrl = '/package-types';
+      let subUrl = '/sub-categories';
+      if (currentShopId) {
+        pkgUrl += '?shop_id=' + currentShopId;
+        subUrl += '?shop_id=' + currentShopId;
+      }
       const [pkgRes, subRes] = await Promise.all([
-        apiFetch('/package-types'),
-        apiFetch('/sub-categories'),
+        apiFetch(pkgUrl),
+        apiFetch(subUrl),
       ]);
       if (pkgRes.code === 0) packageTypes = pkgRes.data;
       if (subRes.code === 0) subCategories = subRes.data;
@@ -705,10 +831,9 @@
     // === Templates ===
     async function loadTemplates() {
       const params = ['category=' + currentMode];
-      if (currentMode === 'tryon') {
-        if (currentPkgType) params.push('package_type=' + encodeURIComponent(currentPkgType));
-        if (currentSubCat) params.push('sub_category=' + encodeURIComponent(currentSubCat));
-      }
+      if (currentShopId) params.push('shop_id=' + currentShopId);
+      if (currentPkgType) params.push('package_type=' + encodeURIComponent(currentPkgType));
+      if (currentSubCat) params.push('sub_category=' + encodeURIComponent(currentSubCat));
       const qs = '?' + params.join('&');
       const res = await apiFetch('/templates' + qs);
       if (res.code === 0) renderGrid(res.data);
@@ -782,38 +907,55 @@
       }
     }
 
-    function onFileSelected(e) {
+    // 前端压缩图片，减小上传体积
+    function compressImage(file, maxWidth, quality) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    async function onFileSelected(e) {
       const file = e.target.files[0];
       if (!file) return;
 
-      // 立即显示本地预览
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const area = document.getElementById('uploadArea');
-        area.classList.add('has-photo');
-        area.innerHTML = `<img class="user-preview" src="${ev.target.result}">`;
-      };
-      reader.readAsDataURL(file);
-
-      // 上传到服务器
-      const formData = new FormData();
-      formData.append('photo', file);
       const isTryon = selectedTemplate && selectedTemplate.category === 'tryon';
       const btnLabel = isTryon ? '开始AI试衣' : '开始AI旅拍';
       document.getElementById('submitBtn').disabled = true;
-      document.getElementById('submitBtn').textContent = '上传中...';
+      document.getElementById('submitBtn').textContent = '压缩中...';
+
+      // 压缩图片（最大1200px宽，质量0.8，通常压缩到100-300KB）
+      const compressed = await compressImage(file, 1200, 0.8);
+      const sizeMB = (compressed.size / 1024 / 1024).toFixed(1);
+
+      // 显示本地预览
+      const previewUrl = URL.createObjectURL(compressed);
+      const area = document.getElementById('uploadArea');
+      area.classList.add('has-photo');
+      area.innerHTML = `<img class="user-preview" src="${previewUrl}">`;
+
+      // 上传压缩后的图片
+      const formData = new FormData();
+      formData.append('photo', compressed, 'photo.jpg');
+      document.getElementById('submitBtn').textContent = '上传中(' + sizeMB + 'MB)...';
 
       fetch(API + '/upload', { method: 'POST', body: formData })
         .then(async r => {
-          const ct = r.headers.get('content-type') || '';
-          if (!ct.includes('application/json')) throw new Error(await r.text());
-          return r.json();
+          const text = await r.text();
+          try { return JSON.parse(text); } catch(e) { throw new Error('服务器返回异常: ' + text.substring(0, 100)); }
         })
         .then(res => {
           if (res.code === 0) {
             uploadedFilename = res.data.filename;
             document.getElementById('submitBtn').disabled = false;
-            // 上传成功后，试衣模式显示体型和年龄选择
             if (isTryon) {
               document.getElementById('bodyTypeSection').style.display = 'block';
               document.getElementById('ageSection').style.display = 'block';
@@ -824,7 +966,9 @@
           document.getElementById('submitBtn').textContent = btnLabel;
         })
         .catch(err => {
-          alert('上传失败: ' + (err.message || '请检查服务'));
+          console.error('Upload error:', err);
+          alert('上传失败: ' + (err.message || '请检查网络'));
+          document.getElementById('submitBtn').disabled = false;
           document.getElementById('submitBtn').textContent = btnLabel;
         });
     }
@@ -882,8 +1026,8 @@
               clearInterval(pollTimer); pollTimer = null;
               document.getElementById('procLoading').style.display = 'none';
               document.getElementById('procResult').style.display = 'block';
-              document.getElementById('resultImg').src = task.result_image_url;
-              document.getElementById('downloadLink').href = task.result_image_url;
+              document.getElementById('resultImg').src = fixUrl(task.result_image_url);
+              document.getElementById('downloadLink').href = fixUrl(task.result_image_url);
               document.getElementById('navTitle').textContent = '生成完成';
             } else if (task.status === 'failed') {
               clearInterval(pollTimer); pollTimer = null;
@@ -916,7 +1060,7 @@
                 <div class="time">${t.created_at}</div>
                 <span class="status status-${t.status}">${statusMap[t.status] || t.status}</span>
               </div>
-              ${t.result_image_url ? `<img src="${t.result_image_url}" style="margin-left:auto">` : ''}
+              ${t.result_image_url ? `<img src="${fixUrl(t.result_image_url)}" style="margin-left:auto">` : ''}
             </div>
           `).join('');
         }
@@ -924,8 +1068,7 @@
     }
 
     // Init
-    loadCategories();
-    loadTemplates();
+    loadShops();
   </script>
 </body>
 </html>

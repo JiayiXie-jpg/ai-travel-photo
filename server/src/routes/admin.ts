@@ -2,9 +2,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { getDb } from '../database';
+import { getDb, getSetting, setSetting } from '../database';
 import { config } from '../config';
 import { adminAuth } from '../middleware/adminAuth';
+import { syncFromRemote } from '../services/syncRemote';
 
 const router = Router();
 
@@ -18,6 +19,23 @@ const templateStorage = multer.diskStorage({
   },
 });
 const templateUpload = multer({ storage: templateStorage, limits: { fileSize: config.maxFileSize } });
+
+// === 同步远程模板 ===
+router.post('/sync', async (_req, res) => {
+  try {
+    const result = await syncFromRemote();
+    res.json({ code: 0, data: result, message: `同步完成：${result.albumsSync} 个相册，${result.imagesSync} 张图片，跳过 ${result.skipped} 个已存在` });
+  } catch (err: any) {
+    res.json({ code: -1, message: '同步失败: ' + err.message });
+  }
+});
+
+// === 店铺列表 ===
+router.get('/shops', (_req, res) => {
+  const db = getDb();
+  const shops = db.prepare('SELECT * FROM shops ORDER BY id').all();
+  res.json({ code: 0, data: shops });
+});
 
 // === 风格列表（去重） ===
 router.get('/styles', (_req, res) => {
@@ -37,13 +55,23 @@ router.get('/styles', (_req, res) => {
 // 查询模板（支持按风格筛选 + 关键词搜索）
 router.get('/templates', (req, res) => {
   const db = getDb();
-  const { style, keyword, show_inactive } = req.query;
+  const { style, keyword, show_inactive, shop_id, category } = req.query;
 
   let sql = 'SELECT * FROM templates WHERE 1=1';
   const params: any[] = [];
 
   if (!show_inactive) {
     sql += ' AND is_active = 1';
+  }
+
+  if (category) {
+    sql += ' AND category = ?';
+    params.push(category);
+  }
+
+  if (shop_id !== undefined) {
+    sql += ' AND shop_id = ?';
+    params.push(Number(shop_id));
   }
 
   if (style) {
@@ -176,6 +204,28 @@ router.get('/stats', (_req, res) => {
     failedTasks: (db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status = 'failed'").get() as any).c,
   };
   res.json({ code: 0, data: stats });
+});
+
+// === 系统设置 ===
+router.get('/settings', (_req, res) => {
+  const db = getDb();
+  const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+  const settings: Record<string, string> = {};
+  for (const row of rows) settings[row.key] = row.value;
+  res.json({ code: 0, data: settings });
+});
+
+router.put('/settings', (req, res) => {
+  const entries = req.body;
+  if (!entries || typeof entries !== 'object') {
+    return res.json({ code: -1, message: '参数错误' });
+  }
+  for (const [key, value] of Object.entries(entries)) {
+    if (typeof value === 'string') {
+      setSetting(key, value);
+    }
+  }
+  res.json({ code: 0, message: '设置已保存' });
 });
 
 export default router;

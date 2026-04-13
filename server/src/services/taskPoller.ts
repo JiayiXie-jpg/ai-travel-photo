@@ -19,6 +19,7 @@ async function downloadImage(url: string): Promise<string> {
 export interface TaskExtra {
   body_type?: string;
   age_range?: string;
+  scene_prompt?: string;
 }
 
 export async function executeTask(taskId: number, templatePath: string, userPhotoPath: string, category: string = 'travel', extra: TaskExtra = {}): Promise<void> {

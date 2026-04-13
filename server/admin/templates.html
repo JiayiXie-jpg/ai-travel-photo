@@ -12,13 +12,30 @@
     <a href="/admin/" class="nav-item">仪表盘</a>
     <a href="/admin/templates.html" class="nav-item active">模板管理</a>
     <a href="/admin/tasks.html" class="nav-item">任务记录</a>
+    <a href="/admin/settings.html" class="nav-item">系统设置</a>
   </nav>
 
   <main class="content">
     <!-- 顶部操作栏 -->
     <div class="page-header">
       <h1>模板管理</h1>
-      <button class="btn btn-primary" onclick="showUploadModal()">+ 上传模板</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="doSync()" id="syncBtn">同步远程模板</button>
+        <button class="btn btn-primary" onclick="showUploadModal()">+ 上传模板</button>
+      </div>
+    </div>
+
+    <!-- 类型切换 -->
+    <div class="category-tabs" id="categoryTabs" style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-sm cat-tab active" data-cat="" onclick="switchCategory('')">全部</button>
+      <button class="btn btn-sm cat-tab" data-cat="tryon" onclick="switchCategory('tryon')">AI试衣</button>
+      <button class="btn btn-sm cat-tab" data-cat="travel" onclick="switchCategory('travel')">AI旅拍</button>
+    </div>
+
+    <!-- 店铺切换 -->
+    <div class="shop-tabs" id="shopTabs" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-sm shop-tab active" data-shop="" onclick="switchShop('')">全部</button>
+      <button class="btn btn-sm shop-tab" data-shop="0" onclick="switchShop('0')">本地上传</button>
     </div>
 
     <!-- 搜索栏 -->
@@ -92,6 +109,61 @@
   <script>
     let allStyles = [];
     let searchTimer = null;
+    let currentShopId = '';
+    let currentCategory = '';
+
+    // 加载店铺列表
+    async function loadShops() {
+      const res = await api('/admin/shops');
+      if (res.code === 0 && res.data) {
+        const container = document.getElementById('shopTabs');
+        const extra = res.data.map(s =>
+          `<button class="btn btn-sm shop-tab" data-shop="${s.id}" onclick="switchShop('${s.id}')">${s.shop_name}</button>`
+        ).join('');
+        container.innerHTML = `
+          <button class="btn btn-sm shop-tab active" data-shop="" onclick="switchShop('')">全部</button>
+          <button class="btn btn-sm shop-tab" data-shop="0" onclick="switchShop('0')">本地上传</button>
+          ${extra}
+        `;
+      }
+    }
+
+    function switchShop(shopId) {
+      currentShopId = shopId;
+      document.querySelectorAll('.shop-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.shop === shopId);
+      });
+      loadAll();
+    }
+
+    function switchCategory(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.cat === cat);
+      });
+      loadAll();
+    }
+
+    // 同步远程模板
+    async function doSync() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.textContent = '同步中...';
+      try {
+        const res = await api('/admin/sync', 'POST');
+        if (res.code === 0) {
+          alert(res.message);
+          loadShops();
+          loadAll();
+        } else {
+          alert(res.message || '同步失败');
+        }
+      } catch (e) {
+        alert('同步出错: ' + e.message);
+      }
+      btn.disabled = false;
+      btn.textContent = '同步远程模板';
+    }
 
     // 加载所有数据
     async function loadAll() {
@@ -101,6 +173,8 @@
       const params = new URLSearchParams();
       if (showInactive) params.set('show_inactive', '1');
       if (keyword) params.set('keyword', keyword);
+      if (currentShopId !== '') params.set('shop_id', currentShopId);
+      if (currentCategory) params.set('category', currentCategory);
 
       const [stylesRes, tplRes] = await Promise.all([
         api('/admin/styles'),
@@ -154,6 +228,7 @@
                 <div class="template-card ${t.is_active ? '' : 'inactive'}">
                   <img src="${t.image_url}" alt="模板">
                   ${t.category === 'tryon' ? '<div class="category-badge tryon">试衣</div>' : '<div class="category-badge travel">旅拍</div>'}
+                  ${t.shop_name ? '<div class="shop-badge">' + t.shop_name + '</div>' : ''}
                   <div class="template-prompt ${t.scene_prompt ? '' : 'no-prompt'}" onclick="editPrompt(${t.id}, this)" title="${t.scene_prompt ? t.scene_prompt.replace(/"/g, '&quot;') : '点击添加场景描述'}">
                     ${t.scene_prompt ? '📝 ' + t.scene_prompt.substring(0, 40) + (t.scene_prompt.length > 40 ? '...' : '') : '⚠️ 无场景描述'}
                   </div>
@@ -320,7 +395,21 @@
       loadAll();
     }
 
+    loadShops();
     loadAll();
   </script>
+  <style>
+    .category-tabs .cat-tab { background: #eee; border: none; cursor: pointer; padding: 6px 16px; border-radius: 4px; font-size: 14px; }
+    .category-tabs .cat-tab.active { background: #e74c3c; color: #fff; }
+    .category-tabs .cat-tab[data-cat="tryon"].active { background: #e74c3c; }
+    .category-tabs .cat-tab[data-cat="travel"].active { background: #2ecc71; }
+    .category-tabs .cat-tab[data-cat=""].active { background: #4a90d9; }
+    .shop-tabs .shop-tab { background: #eee; border: none; cursor: pointer; }
+    .shop-tabs .shop-tab.active { background: #4a90d9; color: #fff; }
+    .shop-badge { position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .category-badge { position: absolute; top: 4px; right: 4px; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .category-badge.tryon { background: #e74c3c; }
+    .category-badge.travel { background: #2ecc71; }
+  </style>
 </body>
 </html>

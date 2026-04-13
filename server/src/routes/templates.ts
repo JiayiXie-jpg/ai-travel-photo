@@ -3,10 +3,17 @@ import { getDb } from '../database';
 
 const router = Router();
 
+// 获取店铺列表
+router.get('/shops', (_req, res) => {
+  const db = getDb();
+  const shops = db.prepare('SELECT * FROM shops WHERE is_active = 1 ORDER BY id').all();
+  res.json({ code: 0, data: shops });
+});
+
 // 获取所有风格（含图片数量）
 router.get('/styles', (req, res) => {
   const db = getDb();
-  const { category, package_type, sub_category } = req.query;
+  const { category, package_type, sub_category, shop_id } = req.query;
 
   let sql = `
     SELECT style_name, COUNT(*) as count,
@@ -27,6 +34,10 @@ router.get('/styles', (req, res) => {
     sql += ' AND sub_category = ?';
     params.push(sub_category);
   }
+  if (shop_id) {
+    sql += ' AND shop_id = ?';
+    params.push(Number(shop_id));
+  }
 
   sql += ' GROUP BY style_name ORDER BY MAX(id) DESC';
 
@@ -35,31 +46,39 @@ router.get('/styles', (req, res) => {
 });
 
 // 获取套餐类型列表
-router.get('/package-types', (_req, res) => {
+router.get('/package-types', (req, res) => {
   const db = getDb();
-  const types = db.prepare(`
-    SELECT DISTINCT package_type FROM templates
-    WHERE is_active = 1 AND package_type != ''
-    ORDER BY package_type
-  `).all() as { package_type: string }[];
+  const { shop_id } = req.query;
+  let sql = `SELECT DISTINCT package_type FROM templates WHERE is_active = 1 AND package_type != ''`;
+  const params: any[] = [];
+  if (shop_id) {
+    sql += ' AND shop_id = ?';
+    params.push(Number(shop_id));
+  }
+  sql += ' ORDER BY package_type';
+  const types = db.prepare(sql).all(...params) as { package_type: string }[];
   res.json({ code: 0, data: types.map(t => t.package_type) });
 });
 
 // 获取服装子类列表
-router.get('/sub-categories', (_req, res) => {
+router.get('/sub-categories', (req, res) => {
   const db = getDb();
-  const cats = db.prepare(`
-    SELECT DISTINCT sub_category FROM templates
-    WHERE is_active = 1 AND sub_category != ''
-    ORDER BY sub_category
-  `).all() as { sub_category: string }[];
+  const { shop_id } = req.query;
+  let sql = `SELECT DISTINCT sub_category FROM templates WHERE is_active = 1 AND sub_category != ''`;
+  const params: any[] = [];
+  if (shop_id) {
+    sql += ' AND shop_id = ?';
+    params.push(Number(shop_id));
+  }
+  sql += ' ORDER BY sub_category';
+  const cats = db.prepare(sql).all(...params) as { sub_category: string }[];
   res.json({ code: 0, data: cats.map(c => c.sub_category) });
 });
 
 // 获取模板列表（支持按风格筛选 + 搜索 + 分类过滤）
 router.get('/templates', (req, res) => {
   const db = getDb();
-  const { style, keyword, category, package_type, sub_category } = req.query;
+  const { style, keyword, category, package_type, sub_category, shop_id } = req.query;
 
   let sql = 'SELECT * FROM templates WHERE is_active = 1';
   const params: any[] = [];
@@ -77,6 +96,11 @@ router.get('/templates', (req, res) => {
   if (sub_category) {
     sql += ' AND sub_category = ?';
     params.push(sub_category);
+  }
+
+  if (shop_id) {
+    sql += ' AND shop_id = ?';
+    params.push(Number(shop_id));
   }
 
   if (style) {

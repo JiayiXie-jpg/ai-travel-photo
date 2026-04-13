@@ -3,8 +3,10 @@ const api = require('../../utils/api');
 Page({
   data: {
     templates: [],
+    shops: [],
     packageTypes: [],
     subCategories: [],
+    currentShopId: '',
     currentPackageType: '',
     currentSubCategory: '',
     searchKeyword: '',
@@ -12,15 +14,28 @@ Page({
   },
 
   onLoad() {
+    this.loadShops();
     this.loadCategories();
     this.loadTemplates();
   },
 
+  async loadShops() {
+    try {
+      const res = await api.getShops();
+      if (res.code === 0) {
+        this.setData({ shops: res.data });
+      }
+    } catch (err) {
+      console.error('loadShops error', err);
+    }
+  },
+
   async loadCategories() {
     try {
+      const shopId = this.data.currentShopId || undefined;
       const [pkgRes, subRes] = await Promise.all([
-        api.getPackageTypes(),
-        api.getSubCategories(),
+        api.getPackageTypes(shopId),
+        api.getSubCategories(shopId),
       ]);
       if (pkgRes.code === 0) {
         this.setData({ packageTypes: pkgRes.data });
@@ -41,6 +56,7 @@ Page({
         undefined,
         this.data.currentPackageType || undefined,
         this.data.currentSubCategory || undefined,
+        this.data.currentShopId || undefined,
       );
       if (res.code === 0) {
         this.setData({ templates: res.data });
@@ -49,6 +65,18 @@ Page({
       wx.showToast({ title: '加载失败', icon: 'none' });
     }
     this.setData({ loading: false });
+  },
+
+  onShopTap(e) {
+    const shopId = e.currentTarget.dataset.shopId || '';
+    if (shopId === this.data.currentShopId) return;
+    this.setData({
+      currentShopId: shopId,
+      currentPackageType: '',
+      currentSubCategory: '',
+    });
+    this.loadCategories();
+    this.loadTemplates();
   },
 
   onPackageTypeTap(e) {
