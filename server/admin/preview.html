@@ -1328,11 +1328,21 @@
     function renderRecommendResults(data) {
       document.getElementById('recResults').style.display = 'block';
 
-      // 分析卡片
+      // 记录用户性别，供点击推荐时过滤模板
       const a = data.analysis;
+      if (a.gender === '男' || a.gender === 'male') {
+        recUserGender = 'male';
+      } else if (a.gender === '女' || a.gender === 'female') {
+        recUserGender = 'female';
+      } else {
+        recUserGender = '';
+      }
+
+      // 分析卡片
       document.getElementById('recAnalysis').innerHTML = `
         <h3>&#128269; AI 分析结果</h3>
         <div class="rec-analysis-row">
+          <span class="rec-tag">性别: ${a.gender || '未知'}</span>
           <span class="rec-tag">年龄: ${a.estimated_age}</span>
           <span class="rec-tag">脸型: ${a.face_shape}</span>
           <span class="rec-tag">体型: ${a.body_type}</span>
@@ -1344,26 +1354,47 @@
 
       // 推荐列表
       const list = document.getElementById('recList');
-      list.innerHTML = data.recommendations.map((rec, i) => `
-        <div class="rec-card" onclick="onRecCardClick('${rec.style_name}', [${rec.template_ids.join(',')}])">
-          <div class="rec-card-header">
-            <span class="rec-card-name">${i + 1}. ${rec.style_name}</span>
-            <span class="rec-card-score">匹配 ${rec.score}%</span>
+      list.innerHTML = data.recommendations.map((rec, i) => {
+        const hasTemplates = rec.template_ids && rec.template_ids.length > 0;
+        const preview = rec.preview_url ? `<img src="${rec.preview_url}" style="width:60px;height:80px;object-fit:cover;border-radius:6px;margin-right:12px;flex-shrink:0">` : '';
+        return `
+        <div class="rec-card" ${hasTemplates ? `onclick="onRecCardClick('${rec.style_name}', [${rec.template_ids.join(',')}])"` : ''} style="${hasTemplates ? 'cursor:pointer' : 'opacity:0.7'}">
+          <div style="display:flex;padding:12px 14px 0">
+            ${preview}
+            <div style="flex:1;min-width:0">
+              <div class="rec-card-header">
+                <span class="rec-card-name">${i + 1}. ${rec.style_name}</span>
+                <span class="rec-card-score">匹配 ${rec.score}%</span>
+              </div>
+              <div class="rec-card-reason">${rec.reason}</div>
+            </div>
           </div>
-          <div class="rec-card-reason">${rec.reason}</div>
-        </div>
-      `).join('');
+          ${hasTemplates
+            ? `<div style="padding:4px 14px 10px;font-size:11px;color:#667eea">${rec.gender_matched ? '点击查看模板 &gt;' : '点击查看模板（暂无同性别样例）&gt;'}</div>`
+            : '<div style="padding:4px 14px 10px;font-size:11px;color:#888">暂无匹配模板</div>'}
+        </div>`;
+      }).join('');
     }
 
+    // 记录推荐分析出的用户性别，用于过滤模板
+    let recUserGender = '';
+
     function onRecCardClick(styleName, templateIds) {
-      if (templateIds.length > 0) {
-        openDetail(templateIds[0]);
-      } else {
-        // 没有模板 ID，跳回列表并搜索
-        document.getElementById('searchInput').value = styleName;
-        showPage('shopDetail');
-        onSearch();
-      }
+      // 跳到模板列表页，按风格名搜索 + 性别过滤
+      document.getElementById('searchInput').value = styleName;
+      showPage('shopDetail');
+      // 带性别过滤加载该风格的模板
+      const genderParam = recUserGender ? '&gender=' + encodeURIComponent(recUserGender) : '';
+      apiFetch('/templates?style=' + encodeURIComponent(styleName) + '&category=' + currentMode + genderParam).then(res => {
+        if (res.code === 0 && res.data.length > 0) {
+          renderGrid(res.data);
+        } else {
+          // 没有同性别模板，fallback 不加性别过滤
+          apiFetch('/templates?style=' + encodeURIComponent(styleName) + '&category=' + currentMode).then(res2 => {
+            if (res2.code === 0) renderGrid(res2.data);
+          });
+        }
+      });
     }
 
     // Init

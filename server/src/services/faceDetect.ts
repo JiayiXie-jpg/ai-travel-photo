@@ -23,10 +23,11 @@ let modelsLoaded = false;
 // 启动时加载模型（只需一次）
 export async function loadModels(): Promise<void> {
   if (modelsLoaded) return;
-  console.log('[FaceDetect] Loading SSD MobileNet model...');
+  console.log('[FaceDetect] Loading SSD MobileNet + AgeGender models...');
   await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_PATH);
+  await faceapi.nets.ageGenderNet.loadFromDisk(MODEL_PATH);
   modelsLoaded = true;
-  console.log('[FaceDetect] Model loaded');
+  console.log('[FaceDetect] Models loaded');
 }
 
 // 人脸检测用的最大尺寸（缩小后检测，节省内存）
@@ -107,6 +108,81 @@ export async function detectFaceBox(
     return { left, top, width: cropWidth, height: cropHeight };
   } catch (err: any) {
     console.error('[FaceDetect] Error:', err.message);
+    return null;
+  }
+}
+
+// 检测性别：返回 'male' | 'female' | null
+export async function detectGender(filePath: string): Promise<'male' | 'female' | null> {
+  if (!modelsLoaded) return null;
+  try {
+    const metadata = await sharp(filePath).metadata();
+    const imgWidth = metadata.width!;
+    const imgHeight = metadata.height!;
+    const scale = Math.min(1, DETECT_MAX_DIM / Math.max(imgWidth, imgHeight));
+    const detectW = Math.round(imgWidth * scale);
+    const detectH = Math.round(imgHeight * scale);
+
+    const imgBuffer = await sharp(filePath)
+      .resize(detectW, detectH, { fit: 'inside' })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+
+    const tensor = tf.tensor3d(imgBuffer, [detectH, detectW, 3]);
+
+    const results = await faceapi
+      .detectAllFaces(tensor as any, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+      .withAgeAndGender();
+
+    tensor.dispose();
+
+    if (results.length === 0) return null;
+
+    // 取最大人脸
+    const largest = results.reduce((a, b) => a.detection.box.area > b.detection.box.area ? a : b);
+    return largest.gender === 'male' ? 'male' : 'female';
+  } catch (err: any) {
+    console.error('[FaceDetect] Gender detection error:', err.message);
+    return null;
+  }
+}
+
+// 从远程 URL 检测性别
+export async function detectGenderFromUrl(imageUrl: string): Promise<'male' | 'female' | null> {
+  if (!modelsLoaded) return null;
+  try {
+    const resp = await fetch(imageUrl);
+    if (!resp.ok) return null;
+    const arrayBuf = await resp.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+
+    const metadata = await sharp(buffer).metadata();
+    const imgWidth = metadata.width!;
+    const imgHeight = metadata.height!;
+    const scale = Math.min(1, DETECT_MAX_DIM / Math.max(imgWidth, imgHeight));
+    const detectW = Math.round(imgWidth * scale);
+    const detectH = Math.round(imgHeight * scale);
+
+    const imgBuffer = await sharp(buffer)
+      .resize(detectW, detectH, { fit: 'inside' })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+
+    const tensor = tf.tensor3d(imgBuffer, [detectH, detectW, 3]);
+
+    const results = await faceapi
+      .detectAllFaces(tensor as any, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+      .withAgeAndGender();
+
+    tensor.dispose();
+
+    if (results.length === 0) return null;
+    const largest = results.reduce((a, b) => a.detection.box.area > b.detection.box.area ? a : b);
+    return largest.gender === 'male' ? 'male' : 'female';
+  } catch (err: any) {
+    console.error('[FaceDetect] Gender URL detection error:', err.message);
     return null;
   }
 }
