@@ -36,6 +36,7 @@
     <view class="analysis-card">
       <text class="analysis-title">&#128269; AI 分析结果</text>
       <view class="analysis-tags">
+        <text class="analysis-tag">性别: {{analysis.gender}}</text>
         <text class="analysis-tag">年龄: {{analysis.estimated_age}}</text>
         <text class="analysis-tag">脸型: {{analysis.face_shape}}</text>
         <text class="analysis-tag">体型: {{analysis.body_type}}</text>

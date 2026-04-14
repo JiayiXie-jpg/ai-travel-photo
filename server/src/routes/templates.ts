@@ -78,7 +78,7 @@ router.get('/sub-categories', (req, res) => {
 // 获取模板列表（支持按风格筛选 + 搜索 + 分类过滤）
 router.get('/templates', (req, res) => {
   const db = getDb();
-  const { style, keyword, category, package_type, sub_category, shop_id } = req.query;
+  const { style, keyword, category, package_type, sub_category, shop_id, gender } = req.query;
 
   let sql = 'SELECT * FROM templates WHERE is_active = 1';
   const params: any[] = [];
@@ -111,6 +111,13 @@ router.get('/templates', (req, res) => {
   if (keyword) {
     sql += ' AND style_name LIKE ?';
     params.push(`%${keyword}%`);
+  }
+
+  // gender 过滤：排除明确异性的模板
+  if (gender === 'male') {
+    sql += " AND gender != 'female'";
+  } else if (gender === 'female') {
+    sql += " AND gender != 'male'";
   }
 
   sql += ' ORDER BY id DESC';

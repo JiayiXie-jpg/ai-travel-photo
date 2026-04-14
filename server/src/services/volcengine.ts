@@ -54,7 +54,9 @@ const DEFAULT_FULL_PROMPT = 'Replace the face in image 2 with the face in image 
 
 const DEFAULT_FACE_PROMPT = 'Replace the face in image 2 with the face in image 1. The output face must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person in the output must be immediately recognizable as the same person in image 1. Keep the angle, lighting, and hair from image 2 unchanged. Generate the highest possible facial similarity to image 1.';
 
-const DEFAULT_TRYON_TEMPLATE = 'Replace the person in image 2 with ${personDesc}. The face, hairstyle, hair color, body shape, body proportions, and skin tone must be completely consistent with the person in image 1. The hairstyle must come from image 1 (the user\'s photo), NOT from image 2. The body type must appear ${bodyDesc} and match the user\'s actual physique. Keep the clothing, pose, background, and lighting from image 2 unchanged. Maintain the aspect ratio of image 2. Generate 4K images. The facial contours, hairstyle, and details must perfectly match the person in Image 1 to ensure high similarity.';
+const DEFAULT_TRYON_TEMPLATE = 'This is a virtual try-on task. Image 1 is the person (user photo). Image 2 is the clothing reference only. Image 3 is a close-up of the person\'s face from image 1 for facial detail reference. Generate a photo of the EXACT same person from image 1 wearing the outfit from image 2. CRITICAL REQUIREMENTS: 1) The face must be 100% identical to image 1 and image 3 - same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person. 2) The hairstyle must be exactly the same as image 1 - same hair color, same hair length, same hair style, same parting. Do NOT change the hairstyle. 3) Keep the background and pose from image 1. 4) Only change the clothing to match image 2.';
+
+const DEFAULT_TRYON_TEMPLATE_NO_FACE = 'This is a virtual try-on task. Image 1 is the person (user photo). Image 2 is the clothing reference only. Generate a photo of the EXACT same person from image 1 wearing the outfit from image 2. CRITICAL REQUIREMENTS: 1) The face must be 100% identical to image 1 - same face shape, same eyes, same nose, same mouth, same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person in image 1. 2) The hairstyle must be exactly the same as image 1 - same hair color, same hair length, same hair style, same parting. Do NOT change the hairstyle. 3) Keep the background and pose from image 1. 4) Only change the clothing to match image 2.';
 
 // 获取有效 prompt：模板级 > 全局设置 > 硬编码默认
 function getEffectivePrompt(settingKey: string, defaultValue: string, scenePrompt?: string): string {
@@ -293,23 +295,77 @@ async function fullImageSwap(
   templateFile: string,
   userFile: string,
   category: string = 'travel',
-  extra: { body_type?: string; age_range?: string } = {},
+  extra: { body_type?: string; age_range?: string; template_image_url?: string } = {},
   scenePrompt?: string,
 ): Promise<GenerateResult> {
-  const prompt = category === 'tryon'
-    ? buildTryonPrompt(extra.body_type, extra.age_range, scenePrompt)
-    : getEffectivePrompt('prompt_travel_full', DEFAULT_FULL_PROMPT, scenePrompt);
   console.log(`[Ark] Using full-image swap strategy, category=${category}`);
 
-  const userDataUrl = await fileToDataUrl(userFile);
-  const templateDataUrl = await fileToDataUrl(templateFile);
-  const outputSize = await calcOutputSize(templateFile);
+  let imageInputs: string[];
+  let hasFaceCrop = false;
 
-  console.log(`[Ark] User image: ${userDataUrl.length}, Template: ${templateDataUrl.length}`);
+  if (category === 'tryon') {
+    // tryon 模式：用 URL 传图（模型能更好地区分 image 1 和 image 2）
+    const userUrl = `${config.baseUrl}/uploads/${path.basename(userFile)}`;
+    const templateUrl = extra.template_image_url || `${config.baseUrl}/templates/${path.basename(templateFile)}`;
+    console.log(`[Ark] Tryon URL mode: user=${userUrl}, template=${templateUrl}`);
+    imageInputs = [userUrl, templateUrl];
 
-  // 统一: image 1=用户, image 2=模板
+    // 尝试裁剪用户脸部特写作为第三张参考图，增强脸部还原度
+    try {
+      const faceBox = await detectFaceBox(userFile, 0.15, 0.15, 0.15, 0.15);
+      if (faceBox) {
+        const faceCropBuffer = await sharp(userFile)
+          .extract(faceBox)
+          .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        // 保存到 uploads 目录，通过 URL 传给 API
+        const { v4: uuidv4 } = require('uuid');
+        const faceFilename = `face_${uuidv4()}.jpg`;
+        const facePath = path.join(config.paths.uploads, faceFilename);
+        fs.writeFileSync(facePath, faceCropBuffer);
+        const faceUrl = `${config.baseUrl}/uploads/${faceFilename}`;
+        imageInputs.push(faceUrl);
+        hasFaceCrop = true;
+        console.log(`[Ark] Face crop added as image 3: ${faceUrl} (${faceBox.width}x${faceBox.height} -> ${faceCropBuffer.length} bytes)`);
+      } else {
+        console.log('[Ark] No face detected in user photo, using 2-image mode');
+      }
+    } catch (faceErr: any) {
+      console.log(`[Ark] Face crop failed: ${faceErr.message}, using 2-image mode`);
+    }
+  } else {
+    // travel 模式：用 base64（保持原有逻辑）
+    const userDataUrl = await fileToDataUrl(userFile);
+    const templateDataUrl = await fileToDataUrl(templateFile);
+    console.log(`[Ark] Travel base64 mode: user=${userDataUrl.length}, template=${templateDataUrl.length}`);
+    imageInputs = [userDataUrl, templateDataUrl];
+  }
+
+  // 根据是否有脸部裁剪选择 prompt
+  let prompt: string;
+  if (category === 'tryon') {
+    if (hasFaceCrop) {
+      prompt = scenePrompt?.trim() || getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE, undefined);
+    } else {
+      prompt = scenePrompt?.trim() || getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE_NO_FACE, undefined);
+    }
+    // 如果有体型/年龄描述，替换占位符
+    if (extra.body_type || extra.age_range) {
+      prompt = buildTryonPrompt(extra.body_type, extra.age_range, prompt);
+    }
+  } else {
+    prompt = getEffectivePrompt('prompt_travel_full', DEFAULT_FULL_PROMPT, scenePrompt);
+  }
+
+  // tryon: 固定 1920x2560（竖版高清），配合 URL 传图效果最佳
+  const outputSize = category === 'tryon' ? '1920x2560' : await calcOutputSize(templateFile);
+
+  console.log(`[Ark] Prompt (${hasFaceCrop ? '3-image' : '2-image'}): ${prompt.substring(0, 100)}...`);
+
+  // 统一: image 1=用户, image 2=模板, (image 3=用户脸部特写)
   const result = await callArkApi(
-    [userDataUrl, templateDataUrl],
+    imageInputs,
     prompt,
     outputSize,
   );
@@ -331,7 +387,7 @@ export async function generateTravelPhoto(
   templatePath: string,
   userPhotoPath: string,
   category: string = 'travel',
-  extra: { body_type?: string; age_range?: string; scene_prompt?: string } = {},
+  extra: { body_type?: string; age_range?: string; scene_prompt?: string; template_image_url?: string } = {},
 ): Promise<GenerateResult> {
   const templateFile = path.join(config.paths.templates, templatePath);
   const userFile = path.join(config.paths.uploads, userPhotoPath);
@@ -367,7 +423,7 @@ export async function generateTravelPhoto(
     }
 
     // 试衣 或 旅拍 fallback：全图方案
-    return await fullImageSwap(templateFile, userFile, category, extra, extra.scene_prompt);
+    return await fullImageSwap(templateFile, userFile, category, { ...extra, template_image_url: extra.template_image_url }, extra.scene_prompt);
   } catch (err: any) {
     console.error('[Ark] Error:', err.message);
     return { success: false, error: '请求失败: ' + err.message };

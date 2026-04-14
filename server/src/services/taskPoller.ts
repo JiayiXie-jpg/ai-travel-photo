@@ -20,6 +20,7 @@ export interface TaskExtra {
   body_type?: string;
   age_range?: string;
   scene_prompt?: string;
+  template_image_url?: string;
 }
 
 export async function executeTask(taskId: number, templatePath: string, userPhotoPath: string, category: string = 'travel', extra: TaskExtra = {}): Promise<void> {

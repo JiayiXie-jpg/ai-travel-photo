@@ -56,7 +56,7 @@ router.post('/tasks', async (req, res) => {
     }
 
     // 异步执行（不阻塞响应）
-    executeTask(taskId, templatePath, user_photo_filename, category, { body_type, age_range, scene_prompt: template.scene_prompt || '' });
+    executeTask(taskId, templatePath, user_photo_filename, category, { body_type, age_range, scene_prompt: template.scene_prompt || '', template_image_url: template.image_url || '' });
   } catch (err: any) {
     console.error('[Tasks] Create error:', err);
     res.json({ code: -1, message: err.message || '服务器错误' });

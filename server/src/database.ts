@@ -78,6 +78,12 @@ export function initDatabase(): void {
     db.exec("ALTER TABLE templates ADD COLUMN remote_album_id INTEGER DEFAULT 0");
   }
 
+  // Migration: add gender column to templates
+  const cols3 = db.prepare("PRAGMA table_info(templates)").all() as { name: string }[];
+  if (!cols3.find(c => c.name === 'gender')) {
+    db.exec("ALTER TABLE templates ADD COLUMN gender TEXT DEFAULT ''");
+  }
+
   // shops 表
   db.exec(`
     CREATE TABLE IF NOT EXISTS shops (

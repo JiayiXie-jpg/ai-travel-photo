@@ -6,6 +6,7 @@ import { getDb, getSetting, setSetting } from '../database';
 import { config } from '../config';
 import { adminAuth } from '../middleware/adminAuth';
 import { syncFromRemote } from '../services/syncRemote';
+import { detectGenderFromUrl } from '../services/faceDetect';
 
 const router = Router();
 
@@ -133,6 +134,15 @@ router.put('/templates/:id/prompt', (req, res) => {
   res.json({ code: 0 });
 });
 
+// 更新模板性别标记
+router.put('/templates/:id/gender', (req, res) => {
+  const { gender } = req.body;
+  if (!gender) return res.json({ code: -1, message: 'gender 必填' });
+  const db = getDb();
+  db.prepare('UPDATE templates SET gender = ? WHERE id = ?').run(gender, req.params.id);
+  res.json({ code: 0 });
+});
+
 // 下架/上架
 router.put('/templates/:id/toggle', (req, res) => {
   const db = getDb();
@@ -226,6 +236,44 @@ router.put('/settings', (req, res) => {
     }
   }
   res.json({ code: 0, message: '设置已保存' });
+});
+
+// 批量检测模板图片性别（face-api.js 本地模型）
+router.post('/classify-gender', async (_req, res) => {
+  const db = getDb();
+
+  const templates = db.prepare(`
+    SELECT id, image_url FROM templates
+    WHERE is_active = 1 AND (gender IS NULL OR gender = '') AND image_url != ''
+    LIMIT 50
+  `).all() as { id: number; image_url: string }[];
+
+  if (templates.length === 0) {
+    return res.json({ code: 0, message: '所有模板已分类完毕', data: { processed: 0, remaining: 0 } });
+  }
+
+  const updateStmt = db.prepare('UPDATE templates SET gender = ? WHERE id = ?');
+  let processed = 0;
+
+  for (const tpl of templates) {
+    try {
+      const gender = await detectGenderFromUrl(tpl.image_url);
+      if (gender) {
+        updateStmt.run(gender, tpl.id);
+        processed++;
+        console.log(`[Gender] Template ${tpl.id}: ${gender}`);
+      } else {
+        updateStmt.run('unknown', tpl.id);
+        console.log(`[Gender] Template ${tpl.id}: unknown (no face)`);
+      }
+    } catch (err: any) {
+      console.error(`[Gender] Template ${tpl.id} error:`, err.message);
+      updateStmt.run('unknown', tpl.id);
+    }
+  }
+
+  const remaining = (db.prepare(`SELECT COUNT(*) as c FROM templates WHERE is_active = 1 AND (gender IS NULL OR gender = '')`).get() as { c: number }).c;
+  res.json({ code: 0, message: `已处理 ${processed} 张`, data: { processed, remaining } });
 });
 
 export default router;
