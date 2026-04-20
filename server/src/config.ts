@@ -46,6 +46,13 @@ export const config = {
     model: process.env.VISION_MODEL || 'doubao-seed-2-0-pro-260215',
   },
 
+  // 人脸融合后处理（lanmei-ai-fusion）
+  fusion: {
+    baseUrl: process.env.FUSION_BASE_URL || 'http://127.0.0.1:7860',
+    enabled: process.env.FUSION_ENABLED !== 'false',
+    timeoutMs: Number(process.env.FUSION_TIMEOUT_MS) || 60000,
+  },
+
   // 蓝莓后台（远程模板同步）
   lanmei: {
     baseUrl: process.env.LANMEI_BASE_URL || 'https://crazyma99.xyz',
