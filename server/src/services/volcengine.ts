@@ -54,9 +54,9 @@ const DEFAULT_FULL_PROMPT = 'Replace the face in image 2 with the face in image 
 
 const DEFAULT_FACE_PROMPT = 'Replace the face in image 2 with the face in image 1. The output face must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person in the output must be immediately recognizable as the same person in image 1. Keep the angle, lighting, and hair from image 2 unchanged. Generate the highest possible facial similarity to image 1.';
 
-const DEFAULT_TRYON_TEMPLATE = 'This is a virtual try-on task. Image 1 is the person (user photo). Image 2 is the clothing reference only. Image 3 is a close-up of the person\'s face from image 1 for facial detail reference. Generate a photo of the EXACT same person from image 1 wearing the outfit from image 2. CRITICAL REQUIREMENTS: 1) The face must be 100% identical to image 1 and image 3 - same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person. 2) The hairstyle must be exactly the same as image 1 - same hair color, same hair length, same hair style, same parting. Do NOT change the hairstyle. 3) Keep the background and pose from image 1. 4) Only change the clothing to match image 2.';
+const DEFAULT_TRYON_TEMPLATE = 'Replace the face of the person in image 2 with the face from image 1. Image 3 is a close-up of the face from image 1 for detail reference. The face in the output must be 100% identical to image 1 and image 3: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person in image 1. Keep the hairstyle, clothing, pose, background, and lighting from image 2 completely unchanged. The body should appear as ${bodyDesc} with proportions matching ${personDesc}. Maintain the aspect ratio of image 2. Generate 4K images.';
 
-const DEFAULT_TRYON_TEMPLATE_NO_FACE = 'This is a virtual try-on task. Image 1 is the person (user photo). Image 2 is the clothing reference only. Generate a photo of the EXACT same person from image 1 wearing the outfit from image 2. CRITICAL REQUIREMENTS: 1) The face must be 100% identical to image 1 - same face shape, same eyes, same nose, same mouth, same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person in image 1. 2) The hairstyle must be exactly the same as image 1 - same hair color, same hair length, same hair style, same parting. Do NOT change the hairstyle. 3) Keep the background and pose from image 1. 4) Only change the clothing to match image 2.';
+const DEFAULT_TRYON_TEMPLATE_NO_FACE = 'Replace the face of the person in image 2 with the face from image 1. The face in the output must be 100% identical to image 1: same face shape, same eyes (size, shape, double/single eyelid), same nose (bridge height, tip shape), same mouth (lip thickness, shape), same jawline, same skin tone, same facial proportions. The person must be immediately recognizable as the same person in image 1. Keep the hairstyle, clothing, pose, background, and lighting from image 2 completely unchanged. The body should appear as ${bodyDesc} with proportions matching ${personDesc}. Maintain the aspect ratio of image 2. Generate 4K images.';
 
 // 获取有效 prompt：模板级 > 全局设置 > 硬编码默认
 function getEffectivePrompt(settingKey: string, defaultValue: string, scenePrompt?: string): string {
@@ -92,8 +92,9 @@ function buildTryonPrompt(bodyType?: string, ageRange?: string, scenePrompt?: st
     personDesc = `the person in image 1 (${parts.join(', ')})`;
   }
 
-  // 获取 prompt 模板（模板级 > 全局设置 > 硬编码默认），然后替换占位符
-  const template = getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE, scenePrompt);
+  // 如果传入了 scenePrompt（已经是选好的模板），直接替换占位符
+  // 否则走 prompt 优先级：模板级 > 全局设置 > 硬编码默认
+  const template = scenePrompt || getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE, undefined);
   return template
     .replace(/\$\{personDesc\}/g, personDesc)
     .replace(/\$\{bodyDesc\}/g, bodyDesc || 'natural');
@@ -290,7 +291,143 @@ async function cropSwapPasteBack(
   return { success: true, imageUrl: localUrl, localPath: filename };
 }
 
-// 方案 B：全图换脸
+// 方案 B：裁剪换脸 + fusion 贴回（tryon 专用，高脸部相似度）
+async function cropSwapFusionPaste(
+  templateFile: string,
+  userFile: string,
+  extra: { body_type?: string; age_range?: string; template_image_url?: string } = {},
+  scenePrompt?: string,
+): Promise<GenerateResult> {
+  console.log('[Ark] Using crop-swap-fusion-paste strategy (tryon)');
+
+  // 1. 检测两张图的人脸
+  const [tplBox, userBox] = await Promise.all([
+    detectFaceBox(templateFile, 0.3, 0.25, 0.3, 0.3),
+    detectFaceBox(userFile, 0.3, 0.25, 0.3, 0.3),
+  ]);
+
+  if (!tplBox || !userBox) {
+    console.log(`[Ark] Face detection failed (tpl=${!!tplBox}, user=${!!userBox}), cannot use fusion strategy`);
+    return { success: false, error: 'fusion: face detection failed' };
+  }
+
+  // 2. 裁剪两张脸
+  const tplFaceBuffer = await sharp(templateFile)
+    .extract(tplBox)
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  const userFaceBuffer = await sharp(userFile)
+    .extract(userBox)
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  console.log(`[Ark] Template face: ${tplBox.width}x${tplBox.height} (${tplFaceBuffer.length} bytes)`);
+  console.log(`[Ark] User face: ${userBox.width}x${userBox.height} (${userFaceBuffer.length} bytes)`);
+
+  // 3. seedream 换脸（image1=用户脸裁剪, image2=模板脸裁剪）
+  const userFaceDataUrl = await bufferToDataUrl(userFaceBuffer);
+  const tplFaceDataUrl = await bufferToDataUrl(tplFaceBuffer);
+
+  const facePrompt = getEffectivePrompt('prompt_travel_face', DEFAULT_FACE_PROMPT, scenePrompt);
+  const faceSize = calcFaceOutputSize(tplBox);
+
+  console.log(`[Ark] Calling seedream for face swap, size=${faceSize}`);
+  const swapResult = await callArkApi(
+    [userFaceDataUrl, tplFaceDataUrl],
+    facePrompt,
+    faceSize,
+  );
+
+  if (swapResult.error) {
+    return { success: false, error: `seedream face swap: ${swapResult.error.code}: ${swapResult.error.message}` };
+  }
+  if (!swapResult.data?.length || !swapResult.data[0].url) {
+    return { success: false, error: 'seedream face swap: no result' };
+  }
+
+  // 4. 下载换脸结果
+  const swappedFaceBuffer = await downloadImage(swapResult.data[0].url);
+  console.log(`[Ark] Swapped face downloaded: ${swappedFaceBuffer.length} bytes`);
+
+  // 5. resize 换脸结果到模板脸部区域大小
+  const resizedSwapped = await sharp(swappedFaceBuffer)
+    .resize(tplBox.width, tplBox.height, { fit: 'fill' })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  // 6. 调用 fusion API：fg=换脸后的脸, bg=模板脸裁剪
+  // fusion 会用 BiSeNet 分割 + 泊松融合，使换脸结果自然融入模板脸部
+  console.log(`[Ark] Calling fusion API: ${config.fusion.baseUrl}/api/fusion`);
+
+  const formData = new FormData();
+  formData.append('fg', new Blob([resizedSwapped], { type: 'image/jpeg' }), 'fg.jpg');
+  formData.append('bg', new Blob([tplFaceBuffer], { type: 'image/jpeg' }), 'bg.jpg');
+
+  const fusionResp = await fetch(`${config.fusion.baseUrl}/api/fusion`, {
+    method: 'POST',
+    body: formData,
+    signal: AbortSignal.timeout(config.fusion.timeoutMs),
+  });
+
+  const fusionJson = await fusionResp.json() as any;
+  console.log(`[Ark] Fusion response: ${JSON.stringify(fusionJson).substring(0, 300)}`);
+
+  if (fusionJson.error) {
+    return { success: false, error: `fusion: ${fusionJson.error}` };
+  }
+
+  // 取 algo_a（泊松融合，最自然）
+  const algoA = fusionJson.algorithms?.algo_a;
+  if (!algoA?.jpg) {
+    return { success: false, error: 'fusion: no algo_a result' };
+  }
+
+  // 7. 下载融合结果
+  const fusedUrl = `${config.fusion.baseUrl}${algoA.jpg}`;
+  const fusedResp = await fetch(fusedUrl);
+  const fusedBuffer = Buffer.from(await fusedResp.arrayBuffer());
+  console.log(`[Ark] Fused face downloaded: ${fusedBuffer.length} bytes`);
+
+  // 8. resize 融合结果到模板脸部区域大小 + 羽化 mask
+  const resizedFused = await sharp(fusedBuffer)
+    .resize(tplBox.width, tplBox.height, { fit: 'fill' })
+    .png()
+    .toBuffer();
+
+  const featherPx = Math.round(Math.min(tplBox.width, tplBox.height) * 0.1);
+  const mask = await createFeatherMask(tplBox.width, tplBox.height, featherPx);
+
+  const fusedWithAlpha = await sharp(resizedFused)
+    .ensureAlpha()
+    .composite([{ input: mask, blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+
+  // 9. 贴回原模板图
+  const finalBuffer = await sharp(templateFile)
+    .composite([{
+      input: fusedWithAlpha,
+      left: tplBox.left,
+      top: tplBox.top,
+      blend: 'over',
+    }])
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  console.log(`[Ark] Final image with fusion: ${finalBuffer.length} bytes`);
+
+  // 10. 保存结果
+  const { v4: uuidv4 } = require('uuid');
+  const filename = `${uuidv4()}.jpg`;
+  const filepath = path.join(config.paths.results, filename);
+  fs.writeFileSync(filepath, finalBuffer);
+
+  const localUrl = `${config.baseUrl}/results/${filename}`;
+  return { success: true, imageUrl: localUrl, localPath: filename };
+}
+
+// 方案 C：全图换脸
 async function fullImageSwap(
   templateFile: string,
   userFile: string,
@@ -342,24 +479,19 @@ async function fullImageSwap(
     imageInputs = [userDataUrl, templateDataUrl];
   }
 
-  // 根据是否有脸部裁剪选择 prompt
+  // 根据是否有脸部裁剪选择 prompt 模板，然后替换体型/年龄占位符
   let prompt: string;
   if (category === 'tryon') {
-    if (hasFaceCrop) {
-      prompt = scenePrompt?.trim() || getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE, undefined);
-    } else {
-      prompt = scenePrompt?.trim() || getEffectivePrompt('prompt_tryon', DEFAULT_TRYON_TEMPLATE_NO_FACE, undefined);
-    }
-    // 如果有体型/年龄描述，替换占位符
-    if (extra.body_type || extra.age_range) {
-      prompt = buildTryonPrompt(extra.body_type, extra.age_range, prompt);
-    }
+    const defaultTemplate = hasFaceCrop ? DEFAULT_TRYON_TEMPLATE : DEFAULT_TRYON_TEMPLATE_NO_FACE;
+    const basePrompt = scenePrompt?.trim() || getEffectivePrompt('prompt_tryon', defaultTemplate, undefined);
+    // 始终走 buildTryonPrompt 替换占位符（即使没传体型/年龄也需要替换为默认值）
+    prompt = buildTryonPrompt(extra.body_type, extra.age_range, basePrompt);
   } else {
     prompt = getEffectivePrompt('prompt_travel_full', DEFAULT_FULL_PROMPT, scenePrompt);
   }
 
-  // tryon: 固定 1920x2560（竖版高清），配合 URL 传图效果最佳
-  const outputSize = category === 'tryon' ? '1920x2560' : await calcOutputSize(templateFile);
+  // 根据模板图计算输出尺寸
+  const outputSize = await calcOutputSize(templateFile);
 
   console.log(`[Ark] Prompt (${hasFaceCrop ? '3-image' : '2-image'}): ${prompt.substring(0, 100)}...`);
 
@@ -422,7 +554,15 @@ export async function generateTravelPhoto(
       }
     }
 
-    // 试衣 或 旅拍 fallback：全图方案
+    // 试衣：优先用裁剪换脸+fusion贴回方案（高脸部相似度）
+    if (category === 'tryon' && config.fusion.enabled) {
+      console.log('[Ark] Tryon mode: trying crop-swap-fusion-paste strategy');
+      const fusionResult = await cropSwapFusionPaste(templateFile, userFile, extra, extra.scene_prompt);
+      if (fusionResult.success) return fusionResult;
+      console.log(`[Ark] Fusion strategy failed: ${fusionResult.error}, falling back to full-image swap`);
+    }
+
+    // 试衣 fallback 或 旅拍 fallback：全图方案
     return await fullImageSwap(templateFile, userFile, category, { ...extra, template_image_url: extra.template_image_url }, extra.scene_prompt);
   } catch (err: any) {
     console.error('[Ark] Error:', err.message);
