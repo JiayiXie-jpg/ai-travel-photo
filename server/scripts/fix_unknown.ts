@@ -3,11 +3,11 @@
 
 import sharp from 'sharp';
 
-const ARK_API_KEY = 'REDACTED_ARK_API_KEY';
+const ARK_API_KEY = process.env.ARK_API_KEY || '';
 const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 const VISION_MODEL = 'doubao-seed-2-0-pro-260215';
 const SERVER_URL = 'http://118.196.36.27:3000';
-const ADMIN_TOKEN = 'admin123';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
 const TEMPLATES = [
   {id:1028, url:"https://www.lanmei66.cloud/test/album-images/1/89/5d86f11c-c817-40df-b07d-5517fd31549c.jpg"},
@@ -84,6 +84,10 @@ async function detectGender(imageUrl: string): Promise<'male' | 'female' | 'unkn
 }
 
 async function main() {
+  if (!ARK_API_KEY || !ADMIN_TOKEN) {
+    throw new Error('请先设置 ARK_API_KEY 和 ADMIN_TOKEN 环境变量');
+  }
+
   console.log(`处理 ${TEMPLATES.length} 张模板...`);
 
   for (const tpl of TEMPLATES) {

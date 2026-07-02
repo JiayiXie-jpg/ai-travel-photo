@@ -11,3 +11,6 @@ server/templates/
 .DS_Store
 *.log
 .env
+server/dist/
+server/server/
+server/.env
